@@ -20,6 +20,11 @@ const client = new Client({
   ],
 });
 
+const {
+  updateStockPrices,
+  createStockUpdateEmbed,
+} = require("./bot/stockManager");
+
 // DB 자동 연결
 require("./Database");
 
@@ -62,9 +67,35 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.once(Events.ClientReady, (c) =>
-  console.log(`✅ 준비 완료! 계정: ${c.user.tag}`),
-);
+// 클라이언트 레디 후 타이머
+client.once(Events.ClientReady, (c) => {
+  console.log(`✅ 준비 완료! 계정: ${c.user.tag}`);
+
+  updateStockPrices();
+
+  setInterval(
+    async () => {
+      try {
+        await updateStockPrices();
+
+        const channelId = "1466810539496706255";
+        const channel = await client.channels.fetch(channelId).catch((err) => {
+          console.error("채널 fetch 오류:", err);
+          return null;
+        });
+        if (!channel) return console.log("알림 채널을 찾을 수 없음");
+
+        const updateEmbed = createStockUpdateEmbed();
+
+        await channel.send({ embeds: [updateEmbed] });
+        console.log("자동 주가 알림(임베드) 전송 완료");
+      } catch (err) {
+        console.error("자동 업데이트/알림 중 오류:", err);
+      }
+    },
+    20000,
+  );
+});
 
 // deploy 함수 불러오기
 const { deployCommands } = require("./deploy-commands");
