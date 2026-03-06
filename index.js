@@ -78,7 +78,7 @@ client.once(Events.ClientReady, (c) => {
       try {
         await updateStockPrices();
 
-        const channelId = "1466810539496706255";
+        const channelId = "1479512968231260432";
         const channel = await client.channels.fetch(channelId).catch((err) => {
           console.error("채널 fetch 오류:", err);
           return null;
