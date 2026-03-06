@@ -93,7 +93,7 @@ client.once(Events.ClientReady, (c) => {
         console.error("자동 업데이트/알림 중 오류:", err);
       }
     },
-    20000,
+    60 * 60 * 1000,
   );
 });
 
