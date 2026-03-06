@@ -188,7 +188,7 @@ function createStockUpdateEmbed() {
       LIMIT 3
     `,
     )
-    .all(now - 20000);
+    .all(now - 60 * 60 * 1000);
 
   if (recentNews.length > 0) {
     let newsContent = "";
