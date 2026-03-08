@@ -65,31 +65,61 @@ client.on(Events.InteractionCreate, async (interaction) => {
 // 클라이언트 레디 후 타이머
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ 준비 완료! 계정: ${c.user.tag}`);
-  setInterval(
-    async () => {
-      try {
-        await updateStockPrices();
 
-        const channelId = "1466810539496706255"; // ← 네가 바꾼 채널 ID
-        const channel = await client.channels.fetch(channelId).catch((err) => {
-          console.error("채널 fetch 오류:", err);
-          return null;
-        });
-        if (!channel) return console.log("알림 채널을 찾을 수 없음");
+  startScheduler();
 
+  function getKSTNow() {
+    return new Date(Date.now() + 9 * 60 * 60 * 1000);
+  }
+
+  function startScheduler() {
+    const now = getKSTNow();
+
+    let nextHour = new Date(now);
+    nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+
+    let delayMs = nextHour - now;
+
+    // 정각 직후 켜졌을 때 이번은 스킵 (선택)
+    if (delayMs < 30 * 1000) {
+      // 30초 이내 → 다음 시간으로
+      nextHour.setHours(nextHour.getHours() + 1);
+      delayMs = nextHour - now;
+    }
+
+    console.log(
+      `다음 주가 업데이트 (KST): ${nextHour.toLocaleString("ko-KR")} ` +
+        `(약 ${Math.round(delayMs / 60000)}분 ${Math.round((delayMs % 60000) / 1000)}초 후)`,
+    );
+
+    setTimeout(async () => {
+      await performUpdate();
+      startScheduler(); // 재귀 호출
+    }, delayMs);
+  }
+
+  async function performUpdate() {
+    try {
+      await updateStockPrices();
+      const channelId = "1466810539496706255";
+      const channel = await client.channels.fetch(channelId).catch(() => null);
+
+      if (channel) {
         const updateEmbed = createStockUpdateEmbed();
-
         await channel.send({
           embeds: [updateEmbed],
           flags: MessageFlags.SuppressNotifications,
         });
-        console.log("자동 주가 알림(임베드) 전송 완료");
-      } catch (err) {
-        console.error("자동 업데이트/알림 중 오류:", err);
+        console.log(
+          `정시 업데이트 완료: ${getKSTNow().toLocaleString("ko-KR")}`,
+        );
+      } else {
+        console.log("알림 채널을 찾을 수 없음");
       }
-    },
-    60 * 60 * 1000,
-  );
+    } catch (err) {
+      console.error("업데이트 중 오류:", err);
+    }
+  }
 });
 
 // deploy 함수 불러오기
