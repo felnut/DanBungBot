@@ -36,7 +36,9 @@ function validateAndSanitizeEnv({ autoFix = true } = {}) {
       try {
         fs.copyFileSync(envPath, `${envPath}.back`);
         fs.writeFileSync(envPath, out.join("\n"), "utf8");
-        console.log(".env 파일의 공백/따옴표를 정리했습니다. (백업: .env.back)");
+        console.log(
+          ".env 파일의 공백/따옴표를 정리했습니다. (백업: .env.back)",
+        );
       } catch (err) {
         console.warn(".env 자동 수정 실패:", err.message);
       }
@@ -99,14 +101,14 @@ async function deployCommands() {
       { body: commands },
     );
     console.log("✅ 명령어 등록 성공!");
-    return true;
+    return true; // 성공 반환
   } catch (error) {
     if (error?.status === 401) {
       console.error("인증 실패 (401): DISCORD_TOKEN 다시 확인해주세요");
-      return false;
+      return false; // 실패 반환
     }
     console.error("명령어 등록 실패:", error?.message || error);
-    return false;
+    return false; // 실패 반환
   }
 }
 

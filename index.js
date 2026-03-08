@@ -1,6 +1,5 @@
 const envFile = process.argv.includes("--test") ? ".env.test" : ".env";
 require("dotenv").config({ path: envFile, override: true });
-
 const {
   Client,
   Collection,
@@ -10,7 +9,6 @@ const {
 } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
-
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -32,13 +30,11 @@ require("./Database");
 client.commands = new Collection();
 const foldersPath = path.join(__dirname, "bot/commands");
 const commandFolders = fs.readdirSync(foldersPath);
-
 for (const folder of commandFolders) {
   const commandsPath = path.join(foldersPath, folder);
   const commandFiles = fs
     .readdirSync(commandsPath)
     .filter((file) => file.endsWith(".js"));
-
   for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
@@ -52,7 +48,6 @@ client.on(Events.InteractionCreate, async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const command = client.commands.get(interaction.commandName);
   if (!command) return;
-
   try {
     await command.execute(interaction);
   } catch (error) {
@@ -70,15 +65,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 // 클라이언트 레디 후 타이머
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ 준비 완료! 계정: ${c.user.tag}`);
-
-  updateStockPrices();
-
   setInterval(
     async () => {
       try {
         await updateStockPrices();
 
-        const channelId = "1479512968231260432";
+        const channelId = "1466810539496706255"; // ← 네가 바꾼 채널 ID
         const channel = await client.channels.fetch(channelId).catch((err) => {
           console.error("채널 fetch 오류:", err);
           return null;
@@ -102,19 +94,25 @@ client.once(Events.ClientReady, (c) => {
 
 // deploy 함수 불러오기
 const { deployCommands } = require("./deploy-commands");
-
 async function start() {
-  // --deploy 붙이면 자동 등록
+  // --deploy 붙이면 자동 등록 후 종료 (로그인 안 함)
   if (process.argv.includes("--deploy")) {
     console.log("🔄 커맨드 등록 시작합니다...");
-    await deployCommands();
+    const success = await deployCommands();
+    if (success) {
+      console.log("✅ 등록 완료! 프로세스 종료.");
+      setTimeout(() => process.exit(0), 1000); // 성공 종료
+    } else {
+      console.error("❌ 등록 실패! 프로세스 종료.");
+      setTimeout(() => process.exit(0), 1000); // 실패 종료
+    }
   }
 
+  // --deploy 없을 때만 로그인
   try {
     await client.login(process.env.DISCORD_TOKEN);
   } catch (err) {
     console.error(err);
   }
 }
-
 start();

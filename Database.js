@@ -107,7 +107,7 @@ try {
   }
 }
 
-// 기획안에 따른 종목 초기화 배열 (5개 종목: symbol, name, price, base_t 설정)
+// 종목 초기화
 const initialStocks = [
   { symbol: "nct", name: "네오코어 테크", price: 145000, base_t: 0.0012 },
   { symbol: "hcp", name: "단소 캐피탈", price: 82000, base_t: 0.0008 },
@@ -124,8 +124,28 @@ const insertStmt = db.prepare(`
 `);
 
 // 배열의 각 종목을 DB에 삽입/업데이트
-initialStocks.forEach((stock) => insertStmt.run(stock));
-console.log("✅ 기획 종목 초기화 완료!");
+const stockCount = db.prepare("SELECT COUNT(*) as cnt FROM stocks").get().cnt;
+
+if (stockCount === 0) {
+  console.log("stocks 테이블이 비어있음 → 초기 종목 데이터 삽입");
+
+  const insertStmt = db.prepare(`
+    INSERT INTO stocks 
+    (symbol, name, price, last_price, base_t, prev_return, cooldown_until)
+    VALUES (@symbol, @name, @price, @price, @base_t, 0, 0)
+  `);
+
+  initialStocks.forEach((stock) => insertStmt.run(stock));
+  console.log("✅ 기획 종목 초기화 완료!");
+} else {
+  console.log("stocks 테이블에 이미 데이터 있음 → 초기화 스킵");
+}
+
+// --deploy 모드에서는 추가 로그만 찍고 넘어가도 됨
+if (process.argv.includes("--deploy")) {
+  console.log("ℹ️ --deploy 모드: stocks 초기화 스킵됨");
+}
+
 console.log(`✅ Connect Database Success! (${dbName})`);
 
 module.exports = db;
