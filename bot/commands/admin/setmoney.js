@@ -1,4 +1,9 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags, Message } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  MessageFlags,
+  Message,
+} = require("discord.js");
 const db = require("../../../Database.js");
 
 module.exports = {
@@ -13,8 +18,7 @@ module.exports = {
         .setName("금액")
         .setDescription("설정할 금액 (음수도 가능)")
         .setRequired(true),
-    )
-    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator), // 서버 관리자도 못 쓰게 하려면 이거 제거하고 아래 코드로 체크
+    ),
 
   async execute(interaction) {
     const ownerId = process.env.OWNER_ID;
