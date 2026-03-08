@@ -87,7 +87,10 @@ client.once(Events.ClientReady, (c) => {
 
         const updateEmbed = createStockUpdateEmbed();
 
-        await channel.send({ embeds: [updateEmbed] });
+        await channel.send({
+          embeds: [updateEmbed],
+          flags: MessageFlags.SuppressNotifications,
+        });
         console.log("자동 주가 알림(임베드) 전송 완료");
       } catch (err) {
         console.error("자동 업데이트/알림 중 오류:", err);
