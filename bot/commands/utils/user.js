@@ -14,11 +14,11 @@ function getUserOrFail(interaction, requiredAmount = 0) {
 
   const user = db.prepare("SELECT * FROM user WHERE user_id = ?").get(userId);
 
-  if (!user) {
+  if (!user) {  //등록 안됨
     throw new Error("NOT_REGISTERED");
   }
 
-  if (requiredAmount > 0 && user.money < requiredAmount) {
+  if (requiredAmount > 0 && user.money < requiredAmount) {  //돈 부족
     throw new Error("INSUFFICIENT_MONEY");
   }
 

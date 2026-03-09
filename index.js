@@ -68,6 +68,9 @@ client.once(Events.ClientReady, (c) => {
 
   startScheduler();
 
+  const baseballGuessEvent = require("./bot/commands/events/messageCreate/baseballGuess");
+  baseballGuessEvent(client);
+
   function getKSTNow() {
     return new Date(Date.now() + 9 * 60 * 60 * 1000);
   }
@@ -80,7 +83,7 @@ client.once(Events.ClientReady, (c) => {
 
     let delayMs = nextHour - now;
 
-    // 정각 직후 켜졌을 때 이번은 스킵 (선택)
+    // 정각 직후 켜졌을 때 이번은 스킵
     if (delayMs < 30 * 1000) {
       // 30초 이내 → 다음 시간으로
       nextHour.setHours(nextHour.getHours() + 1);
@@ -101,7 +104,7 @@ client.once(Events.ClientReady, (c) => {
   async function performUpdate() {
     try {
       await updateStockPrices();
-      const channelId = "1466810539496706255";
+      const channelId = "1479512968231260432";
       const channel = await client.channels.fetch(channelId).catch(() => null);
 
       if (channel) {
