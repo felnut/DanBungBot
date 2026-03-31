@@ -7,7 +7,7 @@ const {
   STOCKS,
   createStockUpdateEmbed,
   createMyStocksEmbed,
-} = require("../../stockManager");
+} = require("../../managers/stockManager");
 const db = require("../../../Database");
 
 module.exports = {
@@ -81,26 +81,82 @@ module.exports = {
     await interaction.deferReply();
     const sub = interaction.options.getSubcommand();
 
+    // ====================== 주가 확인 ======================
     if (sub === "주가") {
       const prices = db
-        .prepare("SELECT name, price, last_change FROM stocks")
+        .prepare(
+          `SELECT symbol, name, price, last_change, last_news_title, last_news_time FROM stocks ORDER BY symbol`,
+        )
         .all();
-      let msg = "━━━ 📈 현재 주가 📈 ━━━\n";
+
+      const embed = new EmbedBuilder()
+        .setColor(0x00aa99)
+        .setTitle("📈 주식 시장 실시간 시황")
+        .setTimestamp()
+        .setFooter({
+          text: "💡 /주식 주가 로 상세 차트 확인 가능 • 실시간 갱신",
+        });
+
+      // 종목 inline field
       prices.forEach((p) => {
         const change = (p.last_change * 100).toFixed(1);
-        msg += `🔹 ${p.name} : ${p.price.toLocaleString()}원 (${change >= 0 ? "🔺" : "🔻"} ${change}%)\n`;
+        const arrow = change >= 0 ? "🔺" : "🔻";
+        const sign = change >= 0 ? "+" : "";
+
+        embed.addFields({
+          name: p.name,
+          value: `${arrow}${sign}${change}%\n${p.price.toLocaleString()}원`,
+          inline: true,
+        });
       });
-      return interaction.editReply(msg);
+
+      // 최근 뉴스 (가장 최근 1개)
+      const recentNews = db
+        .prepare(
+          `SELECT name, last_news_title, last_news_time 
+          FROM stocks WHERE last_news_title 
+          IS NOT NULL ORDER BY last_news_time DESC 
+          LIMIT 1`,
+        )
+        .get();
+
+      if (recentNews?.last_news_title) {
+        const time = new Date(recentNews.last_news_time * 1000); // 밀리초
+        const timeStr = time.toLocaleTimeString("ko-KR", {
+          hour: "numeric",
+          minute: "2-digit",
+          hour12: false,
+        });
+
+        embed.addFields(
+          {
+            name: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            value: "**📰 최근 주요 뉴스**",
+            inline: false,
+          },
+          {
+            name: `[${recentNews.name}]`,
+            value: `${recentNews.last_news_title}\n${timeStr}`,
+            inline: false,
+          },
+        );
+      }
+
+      // 구분선 + 설명
+      embed.setDescription("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+      return interaction.editReply({ embeds: [embed] });
     }
 
+    // ====================== 매수 / 매도 ======================
     if (sub === "매수" || sub === "매도") {
       const symbol = interaction.options.getString("종목");
       const qty = interaction.options.getInteger("수량");
+
       try {
-        const result =
-          sub === "매수"
-            ? buyStock(interaction.user.id, symbol, qty)
-            : sellStock(interaction.user.id, symbol, qty);
+        sub === "매수"
+          ? buyStock(interaction.user.id, symbol, qty)
+          : sellStock(interaction.user.id, symbol, qty);
 
         const portfolioEmbed = createMyStocksEmbed(
           interaction.user.id,
@@ -116,148 +172,58 @@ module.exports = {
       }
     }
 
-    if (sub === "내주식") {
-      const embed = createMyStocksEmbed(
-        interaction.user.id,
-        interaction.user.username,
-      );
-      return interaction.editReply({ embeds: [embed] });
-    }
-
-    // if (sub === "내주식") {
-    //   const holdings = db
-    //     .prepare("SELECT * FROM user_stocks WHERE user_id = ?")
-    //     .all(interaction.user.id);
-    //   if (!holdings.length) return interaction.editReply("아직 주식 없습니다.");
-
-    //   let totalProfit = 0;
-    //   let totalBuyAmount = 0;
-    //   let totalCurrentAmount = 0;
-    //   let totalShares = 0;
-
-    //   const embed = new EmbedBuilder()
-    //     .setTitle(
-    //       `━━━━━━━━━ 📜 ${interaction.user.username}님의 자산 ━━━━━━━━━`,
-    //     )
-    //     .setColor("#00FF00")
-    //     .setTimestamp();
-
-    //   // 합계 계산
-    //   holdings.forEach((h) => {
-    //     const current = db
-    //       .prepare("SELECT price FROM stocks WHERE symbol = ?")
-    //       .get(h.symbol);
-
-    //     const buyAmount = Math.round(h.avg_buy_price * h.shares);
-    //     const currentAmount = Math.round(current.price * h.shares);
-    //     const profit = Math.round((current.price - h.avg_buy_price) * h.shares);
-
-    //     totalBuyAmount += buyAmount;
-    //     totalCurrentAmount += currentAmount;
-    //     totalProfit += profit;
-    //     totalShares += h.shares;
-    //   });
-
-    //   // 총 수익률 % 계산 + 표시 기호 결정
-    //   const totalProfitRate =
-    //     totalBuyAmount > 0
-    //       ? ((totalProfit / totalBuyAmount) * 100).toFixed(1)
-    //       : "0.0";
-
-    //   let totalSign = "";
-    //   if (totalProfit > 0) totalSign = "🔺";
-    //   else if (totalProfit < 0) totalSign = "🔻";
-    //   else totalSign = "🔹";
-
-    //   // 합계 필드
-    //   embed.addFields({
-    //     name: "💰 합계",
-    //     value:
-    //       `총 금액: ${totalCurrentAmount.toLocaleString()}원\n` +
-    //       `총 수익률: ${totalProfit.toLocaleString()}원(${totalSign}${totalProfitRate}%)\n` +
-    //       `총 자산: ${totalShares}주`,
-    //     inline: false,
-    //   });
-
-    //   embed.addFields({
-    //     name: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    //     value: " ",
-    //     inline: false,
-    //   });
-
-    //   // 종목별 필드
-    //   holdings.forEach((h) => {
-    //     const current = db
-    //       .prepare("SELECT price FROM stocks WHERE symbol = ?")
-    //       .get(h.symbol);
-
-    //     const buyPrice = h.avg_buy_price.toLocaleString();
-    //     const currentPrice = current.price.toLocaleString();
-    //     const profitRate = (
-    //       ((current.price - h.avg_buy_price) / h.avg_buy_price) *
-    //       100
-    //     ).toFixed(1);
-    //     const profit = Math.round((current.price - h.avg_buy_price) * h.shares);
-
-    //     let sign = "";
-    //     if (profitRate > 0) sign = "🔺";
-    //     else if (profitRate < 0) sign = "🔻";
-    //     else sign = "🔹";
-
-    //     embed.addFields({
-    //       name: `${STOCKS[h.symbol].name}(구매가 ${buyPrice}원)`,
-    //       value:
-    //         `  - 현재가: ${currentPrice}원\n` +
-    //         `  - 수익률: ${profit.toLocaleString()}원(${sign}${profitRate}%)\n` +
-    //         `  - 구매량: ${h.shares}주`,
-    //       inline: false,
-    //     });
-    //   });
-
-    //   embed.addFields({
-    //     name: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    //     value: " ",
-    //     inline: false,
-    //   });
-
-    //   // footer 타임스탬프
-    //   const now = new Date().toLocaleString("ko-KR", {
-    //     timeZone: "Asia/Seoul",
-    //     year: "numeric",
-    //     month: "long",
-    //     day: "numeric",
-    //     weekday: "long",
-    //     hour: "numeric",
-    //     minute: "numeric",
-    //     hour12: true,
-    //   });
-    //   embed.setFooter({ text: now });
-
-    //   return interaction.editReply({ embeds: [embed] });
-    // }
-
+    // ====================== 내 주식 ======================
     if (sub === "랭킹") {
       const users = db
         .prepare(
-          `
-        SELECT u.user_id, u.money,
-        COALESCE(SUM(us.shares * s.price), 0) as stock_value
-        FROM user u
-        LEFT JOIN user_stocks us ON u.user_id = us.user_id
-        LEFT JOIN stocks s ON us.symbol = s.symbol
-        GROUP BY u.user_id
-        ORDER BY (u.money + stock_value) DESC LIMIT 10
+          `SELECT u.user_id, 
+          COALESCE(SUM(us.shares * s.price), 0) as stock_value 
+          FROM user u 
+          LEFT JOIN user_stocks us 
+          ON u.user_id = us.user_id 
+          LEFT JOIN stocks s 
+          ON us.symbol = s.symbol 
+          GROUP BY u.user_id 
+          HAVING stock_value > 0 
+          ORDER BY stock_value DESC 
+          LIMIT 10
       `,
         )
         .all();
 
-      let msg = "🏆 서버 자산가 순위 🏆\n\n";
-      users.forEach((u, i) => {
-        msg += `${i + 1}. <@${u.user_id}> - ${(u.money + u.stock_value).toLocaleString()}원\n`;
-      });
-      return interaction.editReply(msg);
+      const embed = {
+        color: 0xffd700, // 금색
+        title: "🏆 서버 주식 보유액 랭킹 TOP 10 🏆",
+        description: "실시간 보유 주식 평가액 순위",
+        fields: [],
+        footer: {
+          text: "• 0원 보유자는 제외",
+        },
+        timestamp: new Date(),
+      };
+
+      if (users.length === 0) {
+        embed.description = "아직 주식을 보유한 분이 없네요... 😅";
+        embed.color = 0x7289da; // 블루로 살짝 변경
+      } else {
+        let rankingText = "";
+        users.forEach((u, i) => {
+          const rankEmoji =
+            i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+          rankingText += `${rankEmoji} <@${u.user_id}> **${u.stock_value.toLocaleString()}원**\n`;
+        });
+
+        embed.fields.push({
+          name: "순위",
+          value: rankingText || "아직 데이터가 없어요",
+          inline: false,
+        });
+      }
+
+      return interaction.editReply({ embeds: [embed] });
     }
 
+    // ====================== 주가 강제 업데이트 (관리자 전용) ======================
     if (sub === "업데이트") {
       if (!interaction.member.permissions.has("ADMINISTRATOR")) {
         return interaction.editReply("❌ 관리자만 쓸 수 있습니다.");

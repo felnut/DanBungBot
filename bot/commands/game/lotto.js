@@ -18,18 +18,16 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply();
 
-    const useFee = 500;
+    const useFee = 500; // 복권 가격
 
     let user;
     try {
       user = getUserOrFail(interaction, useFee);
     } catch (err) {
-      let content = "뭔가 잘못됐어 ㅠㅠ";
-      if (err.message === "NOT_REGISTERED")
-        content =
-          "아직 돈 시스템에 가입 안 했어 ㅠㅠ\n먼저 `/돈` 쳐서 지갑 만들어!";
-      else if (err.message === "INSUFFICIENT_MONEY")
-        content = `💸 돈 부족! (500원 필요해~)`;
+      const content =
+        err.message === "NOT_REGISTERED"
+          ? "먼저 `/돈`으로 가입해주세요!"
+          : `💸 돈이 부족해요! (500원 필요)`;
       return interaction.editReply({ content, flags: MessageFlags.Ephemeral });
     }
 
@@ -40,7 +38,8 @@ module.exports = {
     );
     user.money -= useFee;
 
-    // 당첨금 랜덤 뽑기 (가중치 적용)
+    // ==================== 당첨금 뽑기 (가중치 적용) ====================
+    // 낮은 금액이 더 잘 나오게 설계된 가중치 랜덤
     const amounts = Array.from({ length: 100 }, (_, i) => 500 * (i + 1));
     const weights = amounts.map((a) => Math.pow(55000 / a, 1.87));
     const totalWeight = weights.reduce((sum, w) => sum + w, 0);
@@ -57,30 +56,24 @@ module.exports = {
       }
     }
 
-    // 구매 완료 메시지
+    // 구매 완료 화면 (긁기 버튼)
     const buyEmbed = new EmbedBuilder()
       .setTitle("🎫 복권 구매 완료!")
       .setColor("#FFD700")
-      .setDescription(
-        "버튼을 눌러서 복권을 긁으세요!\n낮은 금액이 훨씬 잘 나와요~",
-      )
+      .setDescription("버튼 눌러서 복권 긁어보세요!\n낮은 금액이 더 잘 나와요~")
       .addFields(
         {
-          name: "🧾 결제 정보",
-          value: `500원 차감\n잔액: ${user.money.toLocaleString()}원`,
+          name: "🧾 결제",
+          value: `500원 차감\n잔액: **${user.money.toLocaleString()}원**`,
           inline: true,
         },
-        {
-          name: "⏰ 제한 시간",
-          value: "60초 안에 클릭해주세요. 자동 종료됩니다.",
-          inline: true,
-        },
+        { name: "⏰ 제한시간", value: "60초 안에 클릭!", inline: true },
       );
 
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId("draw_lotto")
-        .setLabel("복권 긁기 🎫")
+        .setLabel("복권 긁기 🎟️")
         .setStyle(ButtonStyle.Primary),
     );
 
@@ -88,7 +81,7 @@ module.exports = {
 
     const message = await interaction.fetchReply();
 
-    // 버튼 대기
+    // 버튼 대기 (60초 제한)
     const filter = (i) => i.user.id === interaction.user.id;
     const collector = message.createMessageComponentCollector({
       filter,
@@ -99,13 +92,13 @@ module.exports = {
     collector.on("collect", async (i) => {
       await i.deferUpdate();
 
+      // 긁는 중 애니메이션
       const scratchingEmbed = new EmbedBuilder()
         .setTitle("🔥 복권 긁는 중...")
         .setColor("#FFAA00")
         .setDescription("두구두구...");
 
       await message.edit({ embeds: [scratchingEmbed], components: [] });
-
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // 당첨금 지급
@@ -117,22 +110,23 @@ module.exports = {
       const updatedUser = db
         .prepare("SELECT money FROM user WHERE user_id = ?")
         .get(user.user_id);
-      const finalBalance = updatedUser.money;
 
       const resultEmbed = new EmbedBuilder()
-        .setTitle("💰 당첨 결과")
+        .setTitle("💰 당첨 결과!")
         .setColor(prize >= 10000 ? "#00FF88" : "#88DDFF")
-        .setDescription(`축하합니다! **${prize.toLocaleString()}원** 당첨!`)
+        .setDescription(`🎉 **${prize.toLocaleString()}원** 당첨!! 축하해요!`)
         .addFields({
           name: "현재 잔액",
-          value: `${finalBalance.toLocaleString()}원`,
-          inline: true,
-        });
+          value: `**${updatedUser.money.toLocaleString()} 원**`,
+          inline: false,
+        })
+        .setTimestamp();
 
       await message.edit({ embeds: [resultEmbed], components: [] });
       collector.stop();
     });
 
+    // 시간 초과 시 환불
     collector.on("end", async (collected, reason) => {
       if (reason === "time") {
         db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
@@ -140,7 +134,7 @@ module.exports = {
           user.user_id,
         );
         await interaction.editReply({
-          content: "시간 초과로 취소되었습니다. 이용료는 반환됩니다.",
+          content: "시간이 지나서 취소됐어요~ 500원은 다시 돌려드렸습니다!",
           embeds: [],
           components: [],
         });

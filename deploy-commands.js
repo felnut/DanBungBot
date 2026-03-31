@@ -4,7 +4,8 @@ const { REST, Routes } = require("discord.js");
 const fs = require("node:fs");
 const path = require("node:path");
 
-// .env 검증 함수
+// ================== .env 파일 검증 및 자동 수정 함수 ==================
+// 필수 환경 변수가 있는지 확인, 값에 포함된 불필요한 공백이나 따옴표를 제거
 function validateAndSanitizeEnv({ autoFix = true } = {}) {
   const required = ["DISCORD_TOKEN", "CLIENT_ID", "GUILD_ID"];
   const envPath = path.join(__dirname, ".env");
@@ -14,12 +15,15 @@ function validateAndSanitizeEnv({ autoFix = true } = {}) {
     const raw = fs.readFileSync(envPath, "utf8");
     const lines = raw.split(/\r?\n/);
     const out = lines.map((line) => {
+      // 주석이나 빈 줄은 그대로 통과
       if (/^\s*#/.test(line) || /^\s*$/.test(line)) return line;
       const idx = line.indexOf("=");
       if (idx === -1) return line;
+
       const key = line.slice(0, idx).trim();
       let val = line.slice(idx + 1).trim();
 
+      // 값 양끝의 따옴표 제거
       if (
         (val.startsWith('"') && val.endsWith('"')) ||
         (val.startsWith("'") && val.endsWith("'"))
@@ -32,6 +36,7 @@ function validateAndSanitizeEnv({ autoFix = true } = {}) {
       return `${key}=${newVal}`;
     });
 
+    // 변경 사항이 있으면 기존 파일을 백업하고 새로 저장
     if (fixed && autoFix) {
       try {
         fs.copyFileSync(envPath, `${envPath}.back`);
@@ -45,6 +50,7 @@ function validateAndSanitizeEnv({ autoFix = true } = {}) {
     }
   }
 
+  // 필수 환경 변수 누락 체크
   const missing = required.filter(
     (k) => !process.env[k] || process.env[k].trim() === "",
   );
@@ -56,6 +62,7 @@ function validateAndSanitizeEnv({ autoFix = true } = {}) {
     return false;
   }
 
+  // 토큰 형식 체크
   if (!process.env.DISCORD_TOKEN.startsWith("M")) {
     console.warn("주의: DISCORD_TOKEN 형식이 올바르지 않은 것 같습니다.");
   }
@@ -63,11 +70,12 @@ function validateAndSanitizeEnv({ autoFix = true } = {}) {
   return true;
 }
 
-// 명령어 수집
+// ================== 로컬 명령어 파일 읽기 및 데이터 수집 ==================
 const commands = [];
 const foldersPath = path.join(__dirname, "bot/commands");
 const commandFolders = fs.readdirSync(foldersPath);
 
+// bot/commands 하위의 모든 폴더를 순회하며 명령어 데이터 읽어오기
 for (const folder of commandFolders) {
   const commandsPath = path.join(foldersPath, folder);
   const commandFiles = fs
@@ -77,14 +85,17 @@ for (const folder of commandFolders) {
   for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
+    // data와 execute 속성이 모두 존재하는 파일만 정상적인 명령어로 취급
     if ("data" in command && "execute" in command) {
       commands.push(command.data.toJSON());
     }
   }
 }
 
+// 디스코드 API에 접근하기 위한 REST 클라이언트 초기화
 const rest = new REST().setToken(process.env.DISCORD_TOKEN);
 
+// ================== 디스코드 API를 호출하여 명령어 최종 등록 ==================
 async function deployCommands() {
   if (!validateAndSanitizeEnv()) {
     console.error("🔎 .env 설정을 먼저 확인해주세요!");
@@ -93,6 +104,7 @@ async function deployCommands() {
 
   try {
     console.log(`${commands.length}개의 명령어를 디스코드에 등록하는 중...`);
+    // 지정된 서버에 명령어 배열 전송
     await rest.put(
       Routes.applicationGuildCommands(
         process.env.CLIENT_ID,

@@ -23,7 +23,7 @@ module.exports = {
     .addIntegerOption((option) =>
       option
         .setName("금액")
-        .setDescription("베팅할 금액을 입력하세요.")
+        .setDescription("베팅할 금액")
         .setRequired(true)
         .setMinValue(1),
     ),
@@ -31,65 +31,49 @@ module.exports = {
   async execute(interaction) {
     await interaction.deferReply();
 
-    const choice = interaction.options.getString("선택");
-    const bet = interaction.options.getInteger("금액");
+    const choice = interaction.options.getString("선택"); // 사용자가 선택한 홀/짝
+    const bet = interaction.options.getInteger("금액"); // 베팅 금액
 
     let user;
     try {
-      user = getUserOrFail(interaction, bet); // 유저 체크
+      user = getUserOrFail(interaction, bet); // 가입 여부 + 잔액 체크
     } catch (err) {
-      let content = "뭔가 잘못됐어 ㅠㅠ";
-      if (err.message === "NOT_REGISTERED") {
-        content =
-          "아직 돈 시스템에 가입 안 했어.\n먼저 `/돈` 쳐서 지갑 만들어!";
-      } else if (err.message === "INSUFFICIENT_MONEY") {
-        content = `💸 돈 부족! (필요: ${bet.toLocaleString()}원)`;
-      }
-      return interaction.editReply({  });
+      let content =
+        err.message === "NOT_REGISTERED"
+          ? "먼저 `/돈`으로 가입해주세요!"
+          : `💸 돈이 부족해요! (필요: ${bet.toLocaleString()}원)`;
+      return interaction.editReply({ content, flags: MessageFlags.Ephemeral });
     }
 
-    // 게임 진행
+    // 결과 생성 및 승패 판단
     const resultNum = Math.floor(Math.random() * 10) + 1;
     const result = resultNum % 2 === 0 ? "even" : "odd";
-    const resultKor = result === "even" ? "짝" : "홀";
-    const playerKor = choice === "even" ? "짝" : "홀";
     const isWin = choice === result;
+    const reward = isWin ? bet * 2 : -bet; // 승리 시 2배, 패배 시 -베팅액
 
-    const reward = isWin ? bet * 2 : -bet;
-
+    // 돈 업데이트
     db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
       reward,
       user.user_id,
     );
 
-    const updatedUser = db
+    // 최신 잔액 가져오기
+    const newBalance = db
       .prepare("SELECT money FROM user WHERE user_id = ?")
-      .get(user.user_id);
-    const newBalance = updatedUser.money;
+      .get(user.user_id).money;
 
-    const resultEmbed = new EmbedBuilder()
+    // 결과 임베드
+    const embed = new EmbedBuilder()
       .setColor(isWin ? 0x57f287 : 0xed4245)
-      .setTitle(isWin ? "💰 승리!" : "💸 패배!")
-      .addFields(
-        {
-          name: "─── 결과 ───",
-          value: `\`나온 수: ${resultNum}(${resultKor})\`\n\`플레이어: ${playerKor}\``,
-          inline: false,
-        },
-        {
-          name: "─── 금액 ───",
-          value: isWin
-            ? `\`베팅: ${user.money.toLocaleString()}원 + 2×${bet.toLocaleString()}원\``
-            : `\`베팅: ${user.money.toLocaleString()}원 -${bet.toLocaleString()}원\``,
-          inline: false,
-        },
-        {
-          name: "─── 총액 ───",
-          value: `**현재 잔액: ${newBalance.toLocaleString()}원**`,
-          inline: false,
-        },
-      );
+      .setTitle(isWin ? "🎉 승리! 2배 당첨!" : "😢 패배...")
+      .setDescription(
+        `🎲나온 숫자\n**${resultNum} (${result === "even" ? "짝" : "홀"})**\n\n` +
+          `👤내 선택\n**${choice === "even" ? "짝" : "홀"}**\n\n` +
+          `💵수익\n**${isWin ? `+${bet.toLocaleString()}` : `-${bet.toLocaleString()}`}원**\n\n` +
+          `💰현재 잔액\n**${newBalance.toLocaleString()}원**`,
+      )
+      .setTimestamp();
 
-    await interaction.editReply({ embeds: [resultEmbed] });
+    await interaction.editReply({ embeds: [embed] });
   },
 };

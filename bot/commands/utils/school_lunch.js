@@ -6,13 +6,6 @@ module.exports = {
     .setName("급식")
     .setDescription("급식을 알려줘요!")
     .addNumberOption((Option) =>
-      Option.setName("년")
-        .setDescription(
-          "년도를 입력해주세요.(입력하지 않으면 현재 년도로 입력됩니다.)",
-        )
-        .setRequired(false),
-    )
-    .addNumberOption((Option) =>
       Option.setName("월")
         .setDescription(
           "월을 입력해주세요.(입력하지 않으면 현재 월로 입력됩니다.)",
@@ -25,19 +18,48 @@ module.exports = {
           "일을 입력해주세요.(입력하지 않으면 현재 일로 입력됩니다.)",
         )
         .setRequired(false),
+    )
+    .addStringOption((Option) =>
+      Option.setName("날짜")
+        .setDescription("오늘 또는 내일 (입력하면 월/일 옵션은 무시됩니다.)")
+        .setRequired(false)
+        .addChoices(
+          { name: "오늘", value: "today" },
+          { name: "내일", value: "tomorrow" },
+        ),
     ),
+
   async execute(interaction) {
     try {
       await interaction.deferReply();
-      const date = new Date();
-      const currentYear = date.getFullYear();
-      const currentMonth = date.getMonth() + 1;
-      const currentDay = date.getDate();
 
-      const finalYear = interaction.options.getNumber("년") ?? currentYear;
-      const finalMonth = String(interaction.options.getNumber("월") ?? currentMonth).padStart(2, "0");
-      const finalDay = String(interaction.options.getNumber("일") ?? currentDay).padStart(2, "0");
+      // 날짜 결정 (오늘/내일 우선, 아니면 직접 입력받은 월/일)
+      const dateKeyword = interaction.options.getString("날짜");
+      let finalYear, finalMonth, finalDay;
 
+      const now = new Date();
+
+      if (dateKeyword === "today") {
+        finalYear = now.getFullYear();
+        finalMonth = String(now.getMonth() + 1).padStart(2, "0");
+        finalDay = String(now.getDate()).padStart(2, "0");
+      } else if (dateKeyword === "tomorrow") {
+        const tomorrow = new Date(now);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        finalYear = tomorrow.getFullYear();
+        finalMonth = String(tomorrow.getMonth() + 1).padStart(2, "0");
+        finalDay = String(tomorrow.getDate()).padStart(2, "0");
+      } else {
+        finalYear = now.getFullYear();
+        finalMonth = String(
+          interaction.options.getNumber("월") ?? now.getMonth() + 1,
+        ).padStart(2, "0");
+        finalDay = String(
+          interaction.options.getNumber("일") ?? now.getDate(),
+        ).padStart(2, "0");
+      }
+
+      // NEIS 교육청 API 호출
       const response = await axios.get(
         `https://open.neis.go.kr/hub/mealServiceDietInfo`,
         {
@@ -63,10 +85,8 @@ module.exports = {
 
         const mealEmbed = new EmbedBuilder()
           .setColor("#045195")
-          .setTitle(`🍴 오늘의 메뉴`)
-          .setAuthor({
-            name: "단국대학교부속소프트웨어고등학교",
-          })
+          .setTitle(`🍴 급식 메뉴`)
+          .setAuthor({ name: "단국대학교부속소프트웨어고등학교" })
           .setDescription(
             `**${row.MLSV_YMD.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")}**\n`,
           )
@@ -77,22 +97,20 @@ module.exports = {
           })
           .setThumbnail(
             "https://cdn-icons-png.flaticon.com/512/3480/3480823.png",
-          ) // 식판 아이콘
+          )
           .setTimestamp();
 
-        await interaction.reply({ embeds: [mealEmbed] });
+        await interaction.editReply({ embeds: [mealEmbed] });
       } else {
-        await interaction.reply(
+        await interaction.editReply(
           `📭 ${finalYear}-${finalMonth}-${finalDay}의 급식 정보가 없습니다.`,
         );
       }
     } catch (error) {
       console.error(error);
-      if (interaction.replied || interaction.deferred) {
-        await interaction.followUp("🚨 오류가 발생했습니다.");
-      } else {
-        await interaction.editReply("🚨 급식을 불러오는 중에 오류가 발생했습니다.");
-      }
+      await interaction.editReply(
+        "🚨 급식을 불러오는 중에 오류가 발생했습니다.",
+      );
     }
   },
 };
