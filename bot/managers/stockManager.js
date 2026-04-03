@@ -292,10 +292,16 @@ function createStockUpdateEmbed() {
 
   const embed = new EmbedBuilder()
     .setColor(0x00aa99)
-    .setTitle("📈 주식 시장 실시간 시황")
-    .setTimestamp();
+    .setTitle("📈 주식 시장 실시간 시황");
 
-  // 종목 inline field로 가로 배치 (3개씩 한 줄)
+  // 제목 후 구분선
+  embed.addFields({
+    name: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
+    value: "",
+    inline: false,
+  });
+
+  // 종목 세로 배치
   stocks.forEach((s) => {
     const change = (s.last_change * 100).toFixed(1);
     const arrow = change >= 0 ? "🔺" : "🔻";
@@ -304,7 +310,7 @@ function createStockUpdateEmbed() {
     embed.addFields({
       name: '',
       value: `${s.name || STOCKS[s.symbol]?.name || s.symbol}\n${arrow}${sign}${change}%\n${s.price.toLocaleString()}원`,
-      inline: true,
+      inline: false,
     });
   });
 
@@ -348,6 +354,12 @@ function createStockUpdateEmbed() {
         inline: false,
       },
     );
+  } else {
+    embed.addFields({
+      name: "**📰 최근 주요 뉴스**",
+      value: "최근 뉴스가 없습니다.",
+      inline: false,
+    });
   }
 
   // 뉴스 후 구분선
@@ -357,8 +369,19 @@ function createStockUpdateEmbed() {
     inline: false,
   });
 
+  // footer 시간
+  const now = new Date();
+  const timeStr = now
+    .toLocaleTimeString("ko-KR", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace("오전 ", "오전 ")
+    .replace("오후 ", "오후 ");
+
   embed.setFooter({
-    text: "💡Tip: `/주식 주가` 명령어로 상세 차트를 확인하세요.",
+    text: `💡 /주식 주가 로 상세 차트 확인 가능 • 실시간 갱신 • 오늘 ${timeStr}`,
   });
 
   return embed;
