@@ -306,7 +306,7 @@ function createStockUpdateEmbed() {
     const change = (s.last_change * 100).toFixed(1);
     const arrow = change >= 0 ? "🔺" : "🔻";
     const sign = change >= 0 ? "+" : "";
-    const name = s.name || STOCKS[s.symbol]?.name || s.symbol;
+    const name = s.name || STOCKS[s.symbol]?.name || s.symbol.toUpperCase();
 
     embed.addFields({
       name: '',
