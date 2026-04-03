@@ -83,69 +83,9 @@ module.exports = {
 
     // ====================== 주가 확인 ======================
     if (sub === "주가") {
-      const prices = db
-        .prepare(
-          `SELECT symbol, name, price, last_change, last_news_title, last_news_time FROM stocks ORDER BY symbol`,
-        )
-        .all();
-
-      const embed = new EmbedBuilder()
-        .setColor(0x00aa99)
-        .setTitle("📈 주식 시장 실시간 시황")
-        .setTimestamp()
-        .setFooter({
-          text: "💡 /주식 주가 로 상세 차트 확인 가능 • 실시간 갱신",
-        });
-
-      // 종목 inline field
-      prices.forEach((p) => {
-        const change = (p.last_change * 100).toFixed(1);
-        const arrow = change >= 0 ? "🔺" : "🔻";
-        const sign = change >= 0 ? "+" : "";
-
-        embed.addFields({
-          name: p.name,
-          value: `${arrow}${sign}${change}%\n${p.price.toLocaleString()}원`,
-          inline: true,
-        });
+      createStockUpdateEmbed().then((embed) => {
+        return interaction.editReply({ embeds: [embed] });
       });
-
-      // 최근 뉴스 (가장 최근 1개)
-      const recentNews = db
-        .prepare(
-          `SELECT name, last_news_title, last_news_time 
-          FROM stocks WHERE last_news_title 
-          IS NOT NULL ORDER BY last_news_time DESC 
-          LIMIT 1`,
-        )
-        .get();
-
-      if (recentNews?.last_news_title) {
-        const time = new Date(recentNews.last_news_time * 1000); // 밀리초
-        const timeStr = time.toLocaleTimeString("ko-KR", {
-          hour: "numeric",
-          minute: "2-digit",
-          hour12: false,
-        });
-
-        embed.addFields(
-          {
-            name: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            value: "**📰 최근 주요 뉴스**",
-            inline: false,
-          },
-          {
-            name: `[${recentNews.name}]`,
-            value: `${recentNews.last_news_title}\n${timeStr}`,
-            inline: false,
-          },
-        );
-      }
-
-      // 구분선 + 설명
-      embed.setDescription("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-      return interaction.editReply({ embeds: [embed] });
     }
 
     // ====================== 매수 / 매도 ======================
