@@ -52,15 +52,15 @@ module.exports = {
     const reward = isWin ? bet * 2 : -bet; // 승리 시 2배, 패배 시 -베팅액
 
     // 돈 업데이트
-    db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
-      reward,
+    const newMoney = user.money + reward;
+    if (newMoney < 0) throw new Error("잔액 부족으로 거래 실패");
+    db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
+      newMoney,
       user.user_id,
     );
 
-    // 최신 잔액 가져오기
-    const newBalance = db
-      .prepare("SELECT money FROM user WHERE user_id = ?")
-      .get(user.user_id).money;
+    // 최종 잔액 표시
+    const newBalance = newMoney;
 
     // 결과 임베드
     const embed = new EmbedBuilder()

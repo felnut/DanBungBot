@@ -102,14 +102,11 @@ module.exports = {
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // 당첨금 지급
-      db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
-        prize,
+      const newMoney = user.money + prize;
+      db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
+        newMoney,
         user.user_id,
       );
-
-      const updatedUser = db
-        .prepare("SELECT money FROM user WHERE user_id = ?")
-        .get(user.user_id);
 
       const resultEmbed = new EmbedBuilder()
         .setTitle("💰 당첨 결과!")
@@ -117,7 +114,7 @@ module.exports = {
         .setDescription(`🎉 **${prize.toLocaleString()}원** 당첨!! 축하해요!`)
         .addFields({
           name: "현재 잔액",
-          value: `**${updatedUser.money.toLocaleString()} 원**`,
+          value: `**${newMoney.toLocaleString()} 원**`,
           inline: false,
         })
         .setTimestamp();

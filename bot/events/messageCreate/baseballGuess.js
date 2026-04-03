@@ -39,8 +39,12 @@ module.exports = (client) => {
       });
 
     if (strike === 4) {
-      db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
-        REWARD,
+      const user = db.prepare("SELECT money FROM user WHERE user_id = ?").get(message.author.id);
+      if (!user) return; // safety
+
+      const newMoney = user.money + REWARD;
+      db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
+        newMoney,
         message.author.id,
       );
 

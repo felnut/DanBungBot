@@ -219,10 +219,13 @@ function buyStock(userId, symbol, quantity) {
   const user = db
     .prepare("SELECT money FROM user WHERE user_id = ?")
     .get(userId);
-  if (user.money < totalCost) throw new Error("잔액이 부족합니다.");
+  if (!user) throw new Error("가입되지 않은 사용자입니다.");
+  if (user.money < 0) throw new Error("통장 잔고가 음수여서 매수할 수 없습니다.");
 
-  db.prepare("UPDATE user SET money = money - ? WHERE user_id = ?").run(
-    totalCost,
+  const newMoney = user.money - totalCost;
+
+  db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
+    newMoney,
     userId,
   );
 
@@ -262,8 +265,15 @@ function sellStock(userId, symbol, quantity) {
     .get(symbol);
   const totalGain = stock.price * quantity;
 
-  db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
-    totalGain,
+  const user = db
+    .prepare("SELECT money FROM user WHERE user_id = ?")
+    .get(userId);
+  if (!user) throw new Error("가입되지 않은 사용자입니다.");
+
+  const newMoney = user.money + totalGain;
+
+  db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
+    newMoney,
     userId,
   );
   db.prepare(

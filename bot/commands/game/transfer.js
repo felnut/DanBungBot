@@ -65,17 +65,19 @@ module.exports = {
     }
 
     // ====================== 실제 송금 처리 ======================
-    db.prepare("UPDATE user SET money = money - ? WHERE user_id = ?").run(
-      amount,
+    const senderNewMoney = sender.money - amount;
+    const receiverNewMoney = receiver.money + amount;
+
+    if (senderNewMoney < 0) throw new Error("잔액 부족으로 송금 실패");
+
+    db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
+      senderNewMoney,
       sender.user_id,
     );
-    db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
-      amount,
+    db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
+      receiverNewMoney,
       target.id,
     );
-
-    const senderNew = sender.money - amount;
-    const receiverNew = receiver.money + amount;
 
     const embed = new EmbedBuilder()
       .setColor("#3498db")
@@ -86,12 +88,12 @@ module.exports = {
       .addFields(
         {
           name: "내 잔고",
-          value: `**${senderNew.toLocaleString()} 원**`,
+          value: `**${senderNewMoney.toLocaleString()} 원**`,
           inline: true,
         },
         {
           name: "받는 사람 잔고",
-          value: `**${receiverNew.toLocaleString()} 원**`,
+          value: `**${receiverNewMoney.toLocaleString()} 원**`,
           inline: true,
         },
       )

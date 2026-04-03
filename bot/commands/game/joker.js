@@ -103,8 +103,9 @@ module.exports = {
       };
       if (currentBank.amount > 0) prize += currentBank.amount;
 
-      db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
-        prize,
+      const newMoney = user.money + prize;
+      db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
+        newMoney,
         interaction.user.id,
       );
       db.prepare("UPDATE bank SET amount = 0, failed_attempts = 0").run();
@@ -165,12 +166,10 @@ module.exports = {
     );
 
     // 최종 잔액 표시
-    const updatedUser = db
-      .prepare("SELECT money FROM user WHERE user_id = ?")
-      .get(interaction.user.id);
+    const finalMoney = card === "Joker" ? newMoney : user.money;
     embed.addFields({
       name: "💰 현재 잔액",
-      value: `${updatedUser.money.toLocaleString()}원`,
+      value: `${finalMoney.toLocaleString()}원`,
       inline: false,
     });
 
