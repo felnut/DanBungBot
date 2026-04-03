@@ -309,7 +309,7 @@ function createStockUpdateEmbed() {
 
     embed.addFields({
       name: '',
-      value: `${s.name || STOCKS[s.symbol]?.name || s.symbol}\n${arrow}${sign}${change}%\n${s.price.toLocaleString()}원`,
+      value: `**${s.name || STOCKS[s.symbol]?.name || s.symbol}\n${arrow}${sign}${change}%\n${s.price.toLocaleString()}원**`,
       inline: false,
     });
   });
