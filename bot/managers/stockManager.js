@@ -306,10 +306,11 @@ function createStockUpdateEmbed() {
     const change = (s.last_change * 100).toFixed(1);
     const arrow = change >= 0 ? "🔺" : "🔻";
     const sign = change >= 0 ? "+" : "";
+    const name = s.name || STOCKS[s.symbol]?.name || s.symbol;
 
     embed.addFields({
       name: '',
-      value: `**${s.name || STOCKS[s.symbol]?.name || s.symbol}\n${arrow}${sign}${change}%\n${s.price.toLocaleString()}원**`,
+      value: `${name} (${s.symbol})\n${arrow}${sign}${change}%\n${s.price.toLocaleString()}원`,
       inline: false,
     });
   });
