@@ -1,80 +1,67 @@
 const { EmbedBuilder } = require("discord.js");
 const db = require("../../../Database");
 const { games } = require("../../commands/utils/gameState"); // 경로가 프로젝트 구조에 따라 달라질 수 있음
+const { REWARD } = require("../../commands/game/baseball");
 
 module.exports = (client) => {
   client.on("messageCreate", async (message) => {
-    // 봇 메시지, DM, 게임 중이 아닌 경우 무시
-    if (message.author.bot) return;
-    if (!message.inGuild()) return;
-    if (!games.has(message.author.id)) return;
+    if (message.author.bot || !message.inGuild() || !games.has(message.author.id))
+      return;
 
     const content = message.content.trim();
 
-    // 1~9 중복 없는 4자리 숫자인지 검사
-    if (/^[1-9]{4}$/.test(content) && new Set(content).size === 4) {
-      const game = games.get(message.author.id);
-      game.tries++;
+    if (!/^[1-9]{4}$/.test(content) || new Set(content).size !== 4) return;
 
-      const guess = content.split("").map(Number);
-      const { s: strike, b: ball } = checkGuess(guess, game.answer);
+    const game = games.get(message.author.id);
+    if (!game) return; // 안전한 접근
 
-      // 히스토리에 기록
-      game.history.push({ guess: content, s: strike, b: ball });
+    game.tries += 1;
+    const guess = content.split("").map(Number);
+    const { s: strike, b: ball } = checkGuess(guess, game.answer);
 
-      // 결과 메시지
-      const embed = new EmbedBuilder()
-        .setColor(strike === 4 ? "#00cc99" : "#3498db")
-        .setTitle(strike === 4 ? "🎉 정답!" : `시도 ${game.tries}회`)
-        .setDescription(
-          strike === 4
-            ? `**${content}** → ${strike}S ${ball}B\n축하해요! 정답 맞췄습니다!`
-            : `**${content}** → **${strike}S ${ball}B**`,
-        );
+    game.history.push({ guess: content, s: strike, b: ball });
+    if (game.history.length > 10) game.history.shift();
 
-      // 히스토리 보여주기
-      const historyText = game.history
-        .map(
-          (entry, i) =>
-            `${i + 1}. **${entry.guess}** → ${entry.s}S ${entry.b}B`,
-        )
-        .join("\n");
-
-      embed.addFields({
+    const embed = new EmbedBuilder()
+      .setColor(strike === 4 ? "#00cc99" : "#3498db")
+      .setTitle(strike === 4 ? "🎉 정답!" : `시도 ${game.tries}회`)
+      .setDescription(
+        strike === 4
+          ? `**${content}** → ${strike}S ${ball}B\n축하해요! 정답 맞췄습니다!`
+          : `**${content}** → **${strike}S ${ball}B**`,
+      )
+      .addFields({
         name: "기록",
-        value: historyText || "아직 추측이 없습니다.",
+        value: game.history
+          .map((entry, i) => `${i + 1}. **${entry.guess}** → ${entry.s}S ${entry.b}B`)
+          .join("\n"),
         inline: false,
       });
 
-      // 정답 맞췄을 때 게임 종료 + 보상 지급
-      if (strike === 4) {
-        const reward = 3000; // baseball.js의 REWARD와 일치시켜야 함
-        db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
-          reward,
-          message.author.id,
-        );
+    if (strike === 4) {
+      db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
+        REWARD,
+        message.author.id,
+      );
 
-        embed
-          .setColor("#57f287")
-          .setDescription(`**${content}** → 4S 정답!\n3000원 지급됐어요! 🎉`)
-          .addFields({ name: "💰 보상", value: "+3,000원", inline: true });
+      embed
+        .setColor("#57f287")
+        .setDescription(`**${content}** → 4S 정답!\n${REWARD.toLocaleString()}원 지급됐어요! 🎉`)
+        .addFields({ name: "💰 보상", value: `+${REWARD.toLocaleString()}원`, inline: true });
 
-        games.delete(message.author.id);
-      }
-      // 10번 다 썼을 때도 종료
-      else if (game.tries >= game.maxTries) {
-        embed
-          .setColor("#ff4444")
-          .setDescription(
-            `10번 다 썼어요... 아쉽네요 ㅠㅠ\n정답은 **${game.answer.join("")}** 였습니다.`,
-          )
-          .addFields({ name: "결과", value: "게임 종료", inline: true });
+      games.delete(message.author.id);
+    } else if (game.tries >= game.maxTries) {
+      embed
+        .setColor("#ff4444")
+        .setDescription(
+          `10번 다 썼어요... 아쉽네요 ㅠㅠ\n정답은 **${game.answer.join("")}** 였습니다.`,
+        )
+        .addFields({ name: "결과", value: "게임 종료", inline: true });
 
-        games.delete(message.author.id);
-      }
-
-      return message.reply({ embeds: [embed] });
+      games.delete(message.author.id);
     }
+
+    await message.reply({ embeds: [embed] });
   });
 };
 
@@ -89,9 +76,9 @@ function checkGuess(guess, answer) {
   let ball = 0;
   for (let i = 0; i < 4; i++) {
     if (guess[i] === answer[i]) {
-      strike++;
+      strike += 1;
     } else if (answer.includes(guess[i])) {
-      ball++;
+      ball += 1;
     }
   }
   return { s: strike, b: ball };

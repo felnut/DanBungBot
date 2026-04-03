@@ -5,7 +5,8 @@
     "checkJs": false,
     "lib": ["es6"],
     "allowSyntheticDefaultImports": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "ignoreDeprecations": "6.0"
   },
   "include": [
     "**/*.js"

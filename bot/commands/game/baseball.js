@@ -135,4 +135,5 @@ module.exports = {
       });
     }
   },
+  REWARD,
 };
