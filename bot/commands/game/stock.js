@@ -83,9 +83,8 @@ module.exports = {
 
     // ====================== 주가 확인 ======================
     if (sub === "주가") {
-      createStockUpdateEmbed().then((embed) => {
-        return interaction.editReply({ embeds: [embed] });
-      });
+      const embed = createStockUpdateEmbed();
+      return interaction.editReply({ embeds: [embed] });
     }
 
     // ====================== 매수 / 매도 ======================
@@ -111,7 +110,11 @@ module.exports = {
         return interaction.editReply(`❌ ${e.message}`);
       }
     }
-
+    // ====================== 내 주식 ======================
+    if (sub === "내주식") {
+      const embed = createMyStocksEmbed(interaction.user.id, interaction.user.username);
+      return interaction.editReply({ embeds: [embed] });
+    }
     // ====================== 내 주식 ======================
     if (sub === "랭킹") {
       const users = db
