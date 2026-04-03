@@ -286,7 +286,7 @@ function sellStock(userId, symbol, quantity) {
 function createStockUpdateEmbed() {
   const stocks = db
     .prepare(
-      "SELECT symbol, name, price, last_change, last_news_title, last_news_time FROM stocks ORDER BY symbol",
+      "SELECT id, symbol, name, price, last_change, last_news_title, last_news_time FROM stocks ORDER BY id ASC",
     )
     .all();
 

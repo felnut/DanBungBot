@@ -43,7 +43,7 @@ db.exec(`
     )
 `);
 
-// ★ stocks 테이블 - id 추가!
+// stocks 테이블
 db.exec(`
     CREATE TABLE IF NOT EXISTS stocks (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
