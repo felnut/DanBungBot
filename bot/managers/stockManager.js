@@ -4,7 +4,7 @@ const { EmbedBuilder } = require("discord.js");
 // 기본 정보 (고정값)
 // 뉴스 시작
 const NEWS_POOL = {
-  nct: [
+  sam: [
     {
       title: "차세대 양자 보안 칩셋 세계 최초 상용화 성공.",
       impactMin: 0.15,
@@ -26,7 +26,7 @@ const NEWS_POOL = {
       impactMax: -0.1,
     },
   ],
-  hcp: [
+  dsc: [
     {
       title: "디지털 자산 담보 대출 서비스 3개월 만에 10조 원 돌파.",
       impactMin: 0.15,
@@ -48,7 +48,7 @@ const NEWS_POOL = {
       impactMax: -0.1,
     },
   ],
-  dac: [
+  dab: [
     {
       title: "정부 주도 GTX-B/C 연장 구간 시공 우선협상대상자 선정.",
       impactMin: 0.15,
@@ -120,17 +120,17 @@ const NEWS_POOL = {
 
 // 종목 시작
 const STOCKS = {
-  nct: {
-    name: "네오코어 테크",
+  sam: {
+    name: "샘숭",
     base_t: 0.0012,
     news: 1.4,
   },
-  hcp: {
+  dsc: {
     name: "단소 캐피탈",
     base_t: 0.0008,
     news: 1.2,
   },
-  dac: {
+  dab: {
     name: "동아 건설",
     base_t: 0.0006,
     news: 1.1,
