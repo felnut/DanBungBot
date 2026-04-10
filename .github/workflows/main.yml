@@ -9,10 +9,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v2
-      - name: Make Docker Env
-        run : |
-          touch ./.env
-          echo "${{ secrets.ENV_SECRET }}" > ./.env
       - name: Connect deploy key
         uses: cloudtype-github-actions/connect@v1
         with:
