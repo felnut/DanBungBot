@@ -1,78 +1,73 @@
 const { EmbedBuilder } = require("discord.js");
 const fs = require("fs");
+const fsp = require("fs/promises");
 const path = require("path");
 
 const filterFilePath = path.join(__dirname, "filter.json");
-let cachedFilter = null;
-let cachedFilterMtime = 0;
 let compiledFilterPatterns = [];
 
 function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function loadFilter() {
+async function loadFilter() {
   try {
-    const stat = fs.statSync(filterFilePath);
-    if (cachedFilter && stat.mtimeMs === cachedFilterMtime) {
-      return;
-    }
-
-    const raw = fs.readFileSync(filterFilePath, "utf8");
+    const raw = await fsp.readFile(filterFilePath, "utf8");
     const parsed = JSON.parse(raw);
-    cachedFilter = parsed;
-    cachedFilterMtime = stat.mtimeMs;
 
-    compiledFilterPatterns = [];
+    const nextPatterns = [];
     for (const [replacement, words] of Object.entries(parsed)) {
       for (const word of words) {
         if (typeof word !== "string" || !word.trim()) continue;
-        compiledFilterPatterns.push({
+        nextPatterns.push({
           regex: new RegExp(escapeRegExp(word), "gi"),
           replacement,
         });
       }
     }
+    compiledFilterPatterns = nextPatterns;
   } catch (err) {
     console.error("필터 파일 로드 실패:", err);
-    cachedFilter = {};
     compiledFilterPatterns = [];
   }
 }
 
-function getFilterPatterns() {
-  if (!cachedFilter) {
-    loadFilter();
-  } else {
-    try {
-      const stat = fs.statSync(filterFilePath);
-      if (stat.mtimeMs !== cachedFilterMtime) {
-        loadFilter();
-      }
-    } catch (err) {
-      // 파일이 삭제된 상황 등 예외 처리
-      console.error("필터 파일 상태 확인 실패:", err);
-      cachedFilter = {};
-      compiledFilterPatterns = [];
-    }
-  }
-
-  return compiledFilterPatterns;
+let reloadTimer = null;
+function scheduleReload() {
+  if (reloadTimer) return;
+  reloadTimer = setTimeout(async () => {
+    reloadTimer = null;
+    await loadFilter();
+  }, 200);
 }
 
 module.exports = (client) => {
+  // 1) 초기 로드 1회 (핫패스 밖)
+  loadFilter();
+
+  // 2) 파일 변경 감지 (핫패스에서 stat/readFile 제거)
+  try {
+    fs.watch(filterFilePath, { persistent: false }, () => {
+      scheduleReload();
+    });
+  } catch (err) {
+    console.error("필터 파일 watch 실패:", err);
+  }
+
   client.on("messageCreate", async (message) => {
     if (message.author.bot || !message.inGuild() || !message.content) return;
 
-    const patterns = getFilterPatterns();
+    const patterns = compiledFilterPatterns;
     if (!patterns.length) return;
 
     let content = message.content;
     let modified = false;
 
     for (const { regex, replacement } of patterns) {
-      if (regex.test(content)) {
-        content = content.replace(regex, replacement);
+      regex.lastIndex = 0; // global regex state safety
+      const next = content.replace(regex, replacement);
+      if (next !== content) {
+        content = next;
         modified = true;
       }
     }

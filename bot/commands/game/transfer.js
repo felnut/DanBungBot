@@ -5,6 +5,12 @@ const {
 } = require("discord.js");
 const db = require("../../../Database");
 const { getUserOrFail } = require("../utils/user");
+const cache = require("../utils/cache");
+
+const stmtSelectReceiver = db.prepare("SELECT money FROM user WHERE user_id = ?");
+const stmtUpdateMoneyDelta = db.prepare(
+  "UPDATE user SET money = money + ? WHERE user_id = ?",
+);
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -54,9 +60,7 @@ module.exports = {
     }
 
     // 받는 사람이 가입되어 있는지 확인
-    const receiver = db
-      .prepare("SELECT * FROM user WHERE user_id = ?")
-      .get(target.id);
+    const receiver = stmtSelectReceiver.get(target.id);
     if (!receiver) {
       return interaction.editReply({
         content: `${target} 님은 아직 가입 안 했어요.\n상대방이 먼저 \`/돈\` 쳐야 송금 가능해요!`,
@@ -70,14 +74,15 @@ module.exports = {
 
     if (senderNewMoney < 0) throw new Error("잔액 부족으로 송금 실패");
 
-    db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
-      senderNewMoney,
-      sender.user_id,
-    );
-    db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
-      receiverNewMoney,
-      target.id,
-    );
+    const tx = db.transaction(() => {
+      stmtUpdateMoneyDelta.run(-amount, sender.user_id);
+      stmtUpdateMoneyDelta.run(amount, target.id);
+    });
+    tx();
+
+    cache.del(`leaderboard:money:myRank:${sender.user_id}`);
+    cache.del(`leaderboard:money:myRank:${target.id}`);
+    cache.del("leaderboard:money:top10");
 
     const embed = new EmbedBuilder()
       .setColor("#3498db")

@@ -9,6 +9,12 @@ const {
 } = require("discord.js");
 const db = require("../../../Database");
 const { getUserOrFail } = require("../utils/user");
+const cache = require("../utils/cache");
+
+// 프리컴퓨트 (매 실행마다 동일 계산 반복 방지)
+const LOTTO_AMOUNTS = Array.from({ length: 100 }, (_, i) => 500 * (i + 1));
+const LOTTO_WEIGHTS = LOTTO_AMOUNTS.map((a) => Math.pow(55000 / a, 1.87));
+const LOTTO_TOTAL_WEIGHT = LOTTO_WEIGHTS.reduce((sum, w) => sum + w, 0);
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -37,21 +43,19 @@ module.exports = {
       user.user_id,
     );
     user.money -= useFee;
+    cache.del(`leaderboard:money:myRank:${user.user_id}`);
+    cache.del("leaderboard:money:top10");
 
     // ==================== 당첨금 뽑기 (가중치 적용) ====================
     // 낮은 금액이 더 잘 나오게 설계된 가중치 랜덤
-    const amounts = Array.from({ length: 100 }, (_, i) => 500 * (i + 1));
-    const weights = amounts.map((a) => Math.pow(55000 / a, 1.87));
-    const totalWeight = weights.reduce((sum, w) => sum + w, 0);
-
-    let rand = Math.random() * totalWeight;
+    let rand = Math.random() * LOTTO_TOTAL_WEIGHT;
     let sum = 0;
     let prize = 500;
 
-    for (let i = 0; i < amounts.length; i++) {
-      sum += weights[i];
+    for (let i = 0; i < LOTTO_AMOUNTS.length; i++) {
+      sum += LOTTO_WEIGHTS[i];
       if (rand <= sum) {
-        prize = amounts[i];
+        prize = LOTTO_AMOUNTS[i];
         break;
       }
     }
@@ -107,6 +111,8 @@ module.exports = {
         newMoney,
         user.user_id,
       );
+      cache.del(`leaderboard:money:myRank:${user.user_id}`);
+      cache.del("leaderboard:money:top10");
 
       const resultEmbed = new EmbedBuilder()
         .setTitle("💰 당첨 결과!")
@@ -130,6 +136,8 @@ module.exports = {
           useFee,
           user.user_id,
         );
+        cache.del(`leaderboard:money:myRank:${user.user_id}`);
+        cache.del("leaderboard:money:top10");
         await interaction.editReply({
           content: "시간이 지나서 취소됐어요~ 500원은 다시 돌려드렸습니다!",
           embeds: [],

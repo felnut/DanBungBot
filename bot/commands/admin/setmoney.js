@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const db = require("../../../Database.js");
+const cache = require("../utils/cache");
 
 /**
  * 돈설정 명령어
@@ -58,6 +59,9 @@ module.exports = {
       amount,
       targetUser.id,
     );
+
+    cache.del(`leaderboard:money:myRank:${targetUser.id}`);
+    cache.del("leaderboard:money:top10");
 
     // 완료 메시지 전송
     await interaction.reply({

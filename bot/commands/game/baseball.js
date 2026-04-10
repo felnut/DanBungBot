@@ -6,6 +6,7 @@ const {
 const { getUserOrFail } = require("../utils/user");
 const db = require("../../../Database");
 const { games } = require("../utils/gameState");
+const cache = require("../utils/cache");
 
 /** 게임 설정값 */
 const BET_AMOUNT = 1000; // 베팅 금액
@@ -69,6 +70,8 @@ module.exports = {
         BET_AMOUNT,
         interaction.user.id,
       );
+      cache.del(`leaderboard:money:myRank:${interaction.user.id}`);
+      cache.del("leaderboard:money:top10");
 
       // 정답 생성하고 게임 상태 저장
       const answer = generateAnswer();

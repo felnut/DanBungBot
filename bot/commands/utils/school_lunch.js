@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const axios = require("axios");
+const cache = require("./cache");
 
 function formatDateOption(value, fallback) {
   if (typeof value !== "number" || Number.isNaN(value) || value <= 0) {
@@ -75,17 +76,26 @@ module.exports = {
         queryDate = `${year}${month}${day}`;
       }
 
-      const response = await axios.get("https://open.neis.go.kr/hub/mealServiceDietInfo", {
-        params: {
-          KEY: process.env.NEIS_KEY,
-          Type: "json",
-          ATPT_OFCDC_SC_CODE: "B10",
-          SD_SCHUL_CODE: "7011489",
-          MLSV_YMD: queryDate,
-        },
-      });
+      const mealInfo = await cache.getOrSet(
+        `schoolLunch:${queryDate}`,
+        30 * 60 * 1000,
+        async () => {
+          const response = await axios.get(
+            "https://open.neis.go.kr/hub/mealServiceDietInfo",
+            {
+              params: {
+                KEY: process.env.NEIS_KEY,
+                Type: "json",
+                ATPT_OFCDC_SC_CODE: "B10",
+                SD_SCHUL_CODE: "7011489",
+                MLSV_YMD: queryDate,
+              },
+            },
+          );
 
-      const mealInfo = response.data?.mealServiceDietInfo?.[1]?.row?.[0];
+          return response.data?.mealServiceDietInfo?.[1]?.row?.[0] || null;
+        },
+      );
       if (!mealInfo) {
         const y = queryDate.slice(0, 4);
         const m = queryDate.slice(4, 6);

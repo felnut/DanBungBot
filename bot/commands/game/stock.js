@@ -9,6 +9,7 @@ const {
   createMyStocksEmbed,
 } = require("../../managers/stockManager");
 const db = require("../../../Database");
+const cache = require("../utils/cache");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -97,6 +98,9 @@ module.exports = {
           ? buyStock(interaction.user.id, symbol, qty)
           : sellStock(interaction.user.id, symbol, qty);
 
+        cache.del(`leaderboard:money:myRank:${interaction.user.id}`);
+        cache.del("leaderboard:money:top10");
+
         const portfolioEmbed = createMyStocksEmbed(
           interaction.user.id,
           interaction.user.username,
@@ -117,9 +121,13 @@ module.exports = {
     }
     // ====================== 내 주식 ======================
     if (sub === "랭킹") {
-      const users = db
-        .prepare(
-          `SELECT u.user_id, 
+      const users = await cache.getOrSet(
+        "leaderboard:stock_value:top10",
+        20000,
+        async () =>
+          db
+            .prepare(
+              `SELECT u.user_id, 
           COALESCE(SUM(us.shares * s.price), 0) as stock_value 
           FROM user u 
           LEFT JOIN user_stocks us 
@@ -131,8 +139,9 @@ module.exports = {
           ORDER BY stock_value DESC 
           LIMIT 10
       `,
-        )
-        .all();
+            )
+            .all(),
+      );
 
       const embed = {
         color: 0xffd700, // 금색
@@ -173,6 +182,7 @@ module.exports = {
       }
       try {
         await updateStockPrices();
+        cache.del("leaderboard:stock_value:top10");
         const updateEmbed = createStockUpdateEmbed();
         return interaction.editReply({
           content: "✅ 주가 업데이트 완료!",

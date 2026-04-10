@@ -5,6 +5,7 @@ const {
 } = require("discord.js");
 const db = require("../../../Database");
 const { getUserOrFail } = require("../utils/user");
+const cache = require("../utils/cache");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -58,6 +59,9 @@ module.exports = {
       newMoney,
       user.user_id,
     );
+
+    cache.del(`leaderboard:money:myRank:${user.user_id}`);
+    cache.del("leaderboard:money:top10");
 
     // 최종 잔액 표시
     const newBalance = newMoney;

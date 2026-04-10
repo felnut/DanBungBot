@@ -5,6 +5,7 @@ const {
 } = require("discord.js");
 const db = require("../../../Database");
 const { getUserOrFail } = require("../utils/user");
+const cache = require("../utils/cache");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -66,6 +67,9 @@ module.exports = {
     db.prepare(
       `UPDATE user SET money = ?, daily_last_reset = ?, streak = ? WHERE user_id = ?`,
     ).run(newMoney, todayResetTimeSec, newStreak, userId);
+
+    cache.del(`leaderboard:money:myRank:${userId}`);
+    cache.del("leaderboard:money:top10");
 
     // 출석 완료 임베드
     const embed = new EmbedBuilder()

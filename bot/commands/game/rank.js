@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
 const db = require("../../../Database");
+const cache = require("../utils/cache");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,9 +11,14 @@ module.exports = {
     await interaction.deferReply();
 
     // 서버 전체 돈 순위 TOP 10 조회
-    const rankings = db
-      .prepare(`SELECT user_id, money FROM user ORDER BY money DESC LIMIT 10`)
-      .all();
+    const rankings = await cache.getOrSet(
+      "leaderboard:money:top10",
+      15000,
+      async () =>
+        db
+          .prepare(`SELECT user_id, money FROM user ORDER BY money DESC LIMIT 10`)
+          .all(),
+    );
 
     if (rankings.length === 0) {
       return interaction.editReply("아직 아무도 돈을 안 벌었네... 출석부터 해보세요! 🔥");
@@ -34,21 +40,27 @@ module.exports = {
       .setTimestamp();
 
     // ====================== 내 순위 추가 ======================
-    const myRow = db
-      .prepare("SELECT money FROM user WHERE user_id = ?")
-      .get(interaction.user.id);
+    const myRankInfo = await cache.getOrSet(
+      `leaderboard:money:myRank:${interaction.user.id}`,
+      15000,
+      async () => {
+        const myRow = db
+          .prepare("SELECT money FROM user WHERE user_id = ?")
+          .get(interaction.user.id);
+        if (!myRow) return null;
 
-    if (myRow) {
-      // 돈 많은 사람 수를 세서 내 순위 계산
-      const richer = db
-        .prepare("SELECT COUNT(*) as cnt FROM user WHERE money > ?")
-        .get(myRow.money).cnt;
+        const richer = db
+          .prepare("SELECT COUNT(*) as cnt FROM user WHERE money > ?")
+          .get(myRow.money).cnt;
 
-      const myRank = richer + 1;
+        return { money: myRow.money, rank: richer + 1 };
+      },
+    );
 
+    if (myRankInfo) {
       embed.addFields({
         name: "📍 내 현재 순위",
-        value: `**${myRank}위** - ${myRow.money.toLocaleString()} 원`,
+        value: `**${myRankInfo.rank}위** - ${myRankInfo.money.toLocaleString()} 원`,
         inline: false,
       });
     } else {

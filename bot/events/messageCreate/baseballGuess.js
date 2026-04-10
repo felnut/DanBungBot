@@ -2,6 +2,7 @@ const { EmbedBuilder } = require("discord.js");
 const db = require("../../../Database");
 const { games } = require("../../commands/utils/gameState"); // 경로가 프로젝트 구조에 따라 달라질 수 있음
 const { REWARD } = require("../../commands/game/baseball");
+const cache = require("../../commands/utils/cache");
 
 module.exports = (client) => {
   client.on("messageCreate", async (message) => {
@@ -39,14 +40,13 @@ module.exports = (client) => {
       });
 
     if (strike === 4) {
-      const user = db.prepare("SELECT money FROM user WHERE user_id = ?").get(message.author.id);
-      if (!user) return; // safety
+      const changes = db
+        .prepare("UPDATE user SET money = money + ? WHERE user_id = ?")
+        .run(REWARD, message.author.id).changes;
+      if (!changes) return; // safety
 
-      const newMoney = user.money + REWARD;
-      db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
-        newMoney,
-        message.author.id,
-      );
+      cache.del(`leaderboard:money:myRank:${message.author.id}`);
+      cache.del("leaderboard:money:top10");
 
       embed
         .setColor("#57f287")

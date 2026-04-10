@@ -4,6 +4,7 @@ const {
   MessageFlags,
 } = require("discord.js");
 const db = require("../../../Database");
+const cache = require("../utils/cache");
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -27,6 +28,9 @@ module.exports = {
       `,
       ).run(interaction.user.id, 1000, 0, 0);
       user = { money: 1000 };
+
+      cache.del(`leaderboard:money:myRank:${interaction.user.id}`);
+      cache.del("leaderboard:money:top10");
     }
 
     // 지갑 임베드 출력

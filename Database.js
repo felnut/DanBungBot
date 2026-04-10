@@ -77,6 +77,12 @@ db.exec(`
     )
 `);
 
+// ================== 인덱스 생성(멱등) ==================
+// 랭킹/순위 계산: ORDER BY / WHERE money > ? 최적화
+db.exec(`CREATE INDEX IF NOT EXISTS idx_user_money ON user(money);`);
+// 최근 뉴스 1건 조회 최적화
+db.exec(`CREATE INDEX IF NOT EXISTS idx_stocks_last_news_time ON stocks(last_news_time);`);
+
 // ================== 스키마 자동 마이그레이션 ==================
 console.log("🔧 스키마 자동 마이그레이션 체크 중...");
 
@@ -168,17 +174,47 @@ console.log("ℹ️ 마이그레이션 완료");
 
 // ================== 초기 종목 데이터 ==================
 const initialStocks = [
-  { symbol: "sam", name: "샘숭", price: 145000, base_t: 0.0012 },
-  { symbol: "dsc", name: "단소 캐피탈", price: 82000, base_t: 0.0008 },
-  { symbol: "dab", name: "동아 건설", price: 39500, base_t: 0.0006 },
-  { symbol: "gpf", name: "그린팜 푸드", price: 24800, base_t: 0.0009 },
-  { symbol: "hlxm", name: "헬릭시온 메디컬", price: 168000, base_t: 0.0018 },
+  { symbol: "hys", name: "한양반도체", price: 145000, base_t: 0.0012 },
+  { symbol: "ftc", name: "퓨처캐피탈", price: 82000, base_t: 0.0008 },
+  { symbol: "djc", name: "대진건설", price: 39500, base_t: 0.0006 },
+  { symbol: "hgf", name: "한그린푸드", price: 24800, base_t: 0.0009 },
+  { symbol: "bhx", name: "바이오헬릭스", price: 168000, base_t: 0.0018 },
 ];
 
+// ================== 심볼 마이그레이션 (데이터 보존) ==================
+// 기존 심볼을 새 심볼로 rename하되, 가격/히스토리/보유주식 등 나머지 컬럼은 그대로 유지합니다.
+// (새 심볼이 이미 존재하면 충돌 방지를 위해 스킵)
+const symbolMigrations = [
+  { from: "sam", to: "hys" },
+  { from: "dsc", to: "ftc" },
+  { from: "dab", to: "djc" },
+  { from: "gpf", to: "hgf" },
+  { from: "hlxm", to: "bhx" },
+];
+
+const runSymbolMigrations = db.transaction(() => {
+  for (const { from, to } of symbolMigrations) {
+    const fromRow = db
+      .prepare("SELECT 1 FROM stocks WHERE symbol = ?")
+      .get(from);
+    if (!fromRow) continue;
+
+    const toRow = db.prepare("SELECT 1 FROM stocks WHERE symbol = ?").get(to);
+    if (toRow) continue;
+
+    db.prepare("UPDATE stocks SET symbol = ? WHERE symbol = ?").run(to, from);
+    db.prepare("UPDATE user_stocks SET symbol = ? WHERE symbol = ?").run(to, from);
+
+    console.log(`✅ stocks/user_stocks 심볼 마이그레이션: ${from} → ${to}`);
+  }
+});
+runSymbolMigrations();
+
 // 은행 Seed
-if (!db.prepare("SELECT * FROM bank").get()) {
-  db.prepare("INSERT INTO bank (amount, failed_attempts) VALUES (0, 0)").run();
-  console.log("✅ bank 초기 데이터 삽입");
+// bank는 단일 row(id=1)만 사용하도록 고정합니다.
+if (!db.prepare("SELECT 1 FROM bank WHERE id = 1").get()) {
+  db.prepare("INSERT INTO bank (id, amount, failed_attempts) VALUES (1, 0, 0)").run();
+  console.log("✅ bank 초기 데이터 삽입 (id=1)");
 }
 
 // stocks Seed (완전히 비어있을 때만)
@@ -201,6 +237,9 @@ console.log("🔄 이름·심볼 동기화 시작...");
 const updateNameStmt = db.prepare(
   "UPDATE stocks SET name = ? WHERE symbol = ?",
 );
+const updateBaseTStmt = db.prepare(
+  "UPDATE stocks SET base_t = ? WHERE symbol = ?",
+);
 const insertStmt = db.prepare(`
   INSERT INTO stocks (symbol, name, price, last_price, base_t, prev_return, cooldown_until)
   VALUES (@symbol, @name, @price, @price, @base_t, 0, 0)
@@ -208,13 +247,17 @@ const insertStmt = db.prepare(`
 
 initialStocks.forEach((stock) => {
   const existing = db
-    .prepare("SELECT id, name FROM stocks WHERE symbol = ?")
+    .prepare("SELECT id, name, base_t FROM stocks WHERE symbol = ?")
     .get(stock.symbol);
 
   if (existing) {
     if (existing.name !== stock.name) {
       updateNameStmt.run(stock.name, stock.symbol);
       console.log(`✅ ${stock.symbol} 이름 업데이트 → ${stock.name}`);
+    }
+    if (existing.base_t !== stock.base_t) {
+      updateBaseTStmt.run(stock.base_t, stock.symbol);
+      console.log(`✅ ${stock.symbol} base_t 업데이트`);
     }
   } else {
     insertStmt.run(stock);
