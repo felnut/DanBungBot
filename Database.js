@@ -179,6 +179,9 @@ const initialStocks = [
   { symbol: "djc", name: "대진건설", price: 39500, base_t: 0.0006 },
   { symbol: "hgf", name: "한그린푸드", price: 24800, base_t: 0.0009 },
   { symbol: "bhx", name: "바이오헬릭스", price: 168000, base_t: 0.0018 },
+  // sugget.md 추가 종목
+  { symbol: "msd", name: "마이크로스터디", price: 91000, base_t: 0.001 },
+  { symbol: "sgmn", name: "서재미나이", price: 132000, base_t: 0.0015 },
 ];
 
 // ================== 심볼 마이그레이션 (데이터 보존) ==================

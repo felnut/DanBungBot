@@ -17,6 +17,7 @@
 
 - 💰 **경제 시스템** : 개인 돈 관리, 데일리 출석 보상, 송금, 서버 랭킹
 - 🎲 **미니게임** : 홀짝 (2배), 복권 (꽝 없음), 조커 (저금 + 대박)
+- 📈 **주식 시스템** : 종목별 주가 변동, 매수/매도, 보유 자산 및 랭킹
 - 🔧 **관리자 명령어** : 봇 주인 전용 돈 강제 설정
 - 🍽️ **학교 급식** : [NEIS Open API](https://open.neis.go.kr/) 기반 급식 조회
 - 🚫 **채팅 검열** : 욕설 자동 필터링 & 대체어 변환
@@ -71,7 +72,7 @@ yarn install
 
 ```
 DISCORD_TOKEN=실제 봇 토큰
-NEIS_TOKEN=나이스 API 키
+NEIS_KEY=나이스 API 키
 CLIENT_ID=봇 애플리케이션 ID
 GUILD_ID=운영서버 ID
 OWNER_ID=테스터 ID
@@ -81,7 +82,7 @@ OWNER_ID=테스터 ID
 
 ```
 DISCORD_TOKEN=테스트 봇 토큰
-NEIS_TOKEN=나이스 API 키
+NEIS_KEY=나이스 API 키
 CLIENT_ID=테스트 봇 애플리케이션 ID
 GUILD_ID=테스트 서버 ID
 OWNER_ID=테스터_ID
@@ -136,9 +137,27 @@ OWNER_ID=테스터_ID
 
 | 컬럼 | 설명 |
 |------|------|
-| id (PK) | 고정값 |
+| id (PK) | 고정값(1) |
 | amount | 조커 누적 저금 |
 | failed_attempts | 실패 횟수 |
+
+#### stocks
+
+| 컬럼 | 설명 |
+|------|------|
+| symbol (UNIQUE) | 종목 심볼 |
+| name | 종목명 |
+| price | 현재가 |
+| base_t | 기본 변동 계수 |
+| last_news_title / last_news_time | 최근 뉴스 |
+
+#### user_stocks
+
+| 컬럼 | 설명 |
+|------|------|
+| user_id + symbol (PK) | 유저 보유 종목 키 |
+| shares | 보유 주식 수 |
+| avg_buy_price | 평단가 |
 
 ---
 
@@ -169,6 +188,14 @@ OWNER_ID=테스터_ID
 
 ---
 
+## 성능 최적화 노트
+
+- 랭킹/주식 시황/주식 랭킹은 **인메모리 캐시(Map+TTL)** 를 사용해 반복 호출 시 DB 부하를 줄입니다(프로세스 재시작 시 캐시는 초기화됩니다).
+- 주식 매수/매도, 송금, 조커(은행)는 **트랜잭션**으로 묶어 부분 업데이트를 방지합니다.
+- `bank`는 **단일 행(id=1)** 만 사용하도록 고정합니다.
+
+---
+
 ## 기여
 
 버그 리포트 및 기능 제안은  
@@ -182,4 +209,4 @@ Pull Request도 언제든 환영합니다.
 
 본 프로젝트는 [MIT License](https://opensource.org/licenses/MIT)를 따릅니다.
 
-Copyright © 2025 [이름 또는 닉네임]
+Copyright © 2026 ZYNTAX6760
