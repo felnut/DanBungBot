@@ -50,6 +50,22 @@ for (const folder of commandFolders) {
 
 // ================== 유저와의 인터랙션(슬래시 명령어) 발생 시 처리 ==================
 client.on(Events.InteractionCreate, async (interaction) => {
+  if (interaction.isAutocomplete()) {
+    const command = client.commands.get(interaction.commandName);
+    if (!command?.autocomplete) return;
+    try {
+      await command.autocomplete(interaction);
+    } catch (error) {
+      console.error(error);
+      try {
+        await interaction.respond([]);
+      } catch {
+        /* 이미 응답했거나 만료됨 */
+      }
+    }
+    return;
+  }
+
   if (!interaction.isChatInputCommand()) return; // 채팅 명령어가 아니면 무시
 
   const command = client.commands.get(interaction.commandName);

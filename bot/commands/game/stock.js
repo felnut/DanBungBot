@@ -7,6 +7,7 @@ const {
   STOCKS,
   createStockUpdateEmbed,
   createMyStocksEmbed,
+  getStocksForAutocomplete,
 } = require("../../managers/stockManager");
 const db = require("../../../Database");
 const cache = require("../utils/cache");
@@ -25,14 +26,9 @@ module.exports = {
         .addStringOption((opt) =>
           opt
             .setName("종목")
-            .setDescription("종목명")
+            .setDescription("종목명 (입력 시 목록이 뜹니다)")
             .setRequired(true)
-            .addChoices(
-              ...Object.keys(STOCKS).map((k) => ({
-                name: STOCKS[k].name,
-                value: k,
-              })),
-            ),
+            .setAutocomplete(true),
         )
         .addIntegerOption((opt) =>
           opt
@@ -49,14 +45,9 @@ module.exports = {
         .addStringOption((opt) =>
           opt
             .setName("종목")
-            .setDescription("종목명")
+            .setDescription("종목명 (입력 시 목록이 뜹니다)")
             .setRequired(true)
-            .addChoices(
-              ...Object.keys(STOCKS).map((k) => ({
-                name: STOCKS[k].name,
-                value: k,
-              })),
-            ),
+            .setAutocomplete(true),
         )
         .addIntegerOption((opt) =>
           opt
@@ -192,5 +183,27 @@ module.exports = {
         return interaction.editReply(`❌ 업데이트 중 오류: ${e.message}`);
       }
     }
+  },
+
+  async autocomplete(interaction) {
+    const focused = interaction.options.getFocused(true);
+    if (focused.name !== "종목") return;
+
+    const q = focused.value.trim().toLowerCase();
+    const rows = getStocksForAutocomplete();
+    const filtered = rows
+      .filter(
+        (r) =>
+          !q ||
+          r.name.toLowerCase().includes(q) ||
+          r.symbol.toLowerCase().includes(q),
+      )
+      .slice(0, 25)
+      .map((r) => ({
+        name: `${r.name} (${r.symbol})`,
+        value: r.symbol,
+      }));
+
+    await interaction.respond(filtered);
   },
 };

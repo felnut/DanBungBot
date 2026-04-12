@@ -656,6 +656,14 @@ function createMyStocksEmbed(userId, username) {
   return embed;
 }
 
+/** DB에 등록된 종목(이름·심볼) — 슬래시 자동완성용 */
+function getStocksForAutocomplete() {
+  return stmtSelectStocksForEmbed.all().map((s) => ({
+    symbol: s.symbol,
+    name: s.name || STOCKS[s.symbol]?.name || s.symbol,
+  }));
+}
+
 module.exports = {
   updateStockPrices,
   buyStock,
@@ -663,4 +671,5 @@ module.exports = {
   STOCKS,
   createStockUpdateEmbed,
   createMyStocksEmbed,
+  getStocksForAutocomplete,
 };
