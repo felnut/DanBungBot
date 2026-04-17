@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "module": "Node16",
+    "target": "es6",
+    "checkJs": false,
+    "lib": ["es6"],
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node16"
+  },
+  "include": [
+    "**/*.js"
+  ],
+  "exclude": [
+    "node_modules"
+  ]
+}
