@@ -10,7 +10,13 @@ const cache = require("../utils/cache");
 
 /** 게임 설정값 */
 const BET_AMOUNT = 1000; // 베팅 금액
-const REWARD = BET_AMOUNT * 3; // 승리 시 받는 보상 (3000원)
+const MAX_TRIES = 10;
+
+// 시도 횟수가 적을수록 보상이 큼. 보상 = 1280 - 60 × 시도 횟수 (1회 1,220원 ... 4회 1,040원 ... 10회 680원)
+// 거의 최적으로 푸는 풀이기(평균 약 4.9회) 기준 환수율 약 98.5%, 일반 플레이어는 그보다 조금 손해
+function rewardFor(tries) {
+  return 1280 - 60 * tries;
+}
 
 // 헬퍼 함수: 1~9 중복 없는 4자리 정답 생성
 function generateAnswer() {
@@ -78,7 +84,7 @@ module.exports = {
       games.set(interaction.user.id, {
         answer,
         tries: 0,
-        maxTries: 10,
+        maxTries: MAX_TRIES,
         history: [],
       });
       saveGame(interaction.user.id);
@@ -98,7 +104,7 @@ module.exports = {
                 "1234 → **1S 1B**\n" +
                 "8421 → **2S 2B**\n" +
                 "4821 → **4S 정답!**\n\n" +
-                `💰 **${BET_AMOUNT}원** 베팅 → 이기면 **${REWARD}원**\n` +
+                `💰 **${BET_AMOUNT}원** 베팅 → 적게 시도할수록 보상이 커요 (1회 ${rewardFor(1)}원 → 5회 ${rewardFor(5)}원 → 최소 ${rewardFor(10)}원)\n` +
                 "기회는 총 **10번**\n\n" +
                 "채팅에 **4자리 숫자**만 입력하면 바로 결과 나와요!\n" +
                 "포기하고 싶으면 `/숫자야구 포기`를 입력하세요!",
@@ -139,5 +145,5 @@ module.exports = {
       });
     }
   },
-  REWARD,
+  rewardFor,
 };

@@ -15,7 +15,7 @@ const cache = require("../utils/cache");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("주식")
-    .setDescription("서버 실시간 주식 거래소")
+    .setDescription("서버 주식 거래소 (10분마다 시세 갱신)")
     .addSubcommand((sub) =>
       sub.setName("주가").setDescription("현재 주가 확인"),
     )
@@ -172,7 +172,7 @@ module.exports = {
         return interaction.editReply("❌ 관리자만 쓸 수 있습니다.");
       }
       try {
-        await updateStockPrices();
+        await updateStockPrices({ force: true });
         cache.del("leaderboard:stock_value:top10");
         const updateEmbed = createStockUpdateEmbed();
         return interaction.editReply({

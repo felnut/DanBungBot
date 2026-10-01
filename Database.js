@@ -169,6 +169,20 @@ ensureColumn("stocks", "cooldown_until INTEGER DEFAULT 0");
 ensureColumn("stocks", "last_news_title TEXT DEFAULT NULL");
 ensureColumn("stocks", "last_news_time INTEGER DEFAULT 0");
 ensureColumn("user_stocks", "avg_buy_price REAL DEFAULT 0");
+// 일봉(시가/고가/저가) 컬럼 — 전일 종가는 last_price를 사용
+ensureColumn("stocks", "day_open REAL DEFAULT 0");
+ensureColumn("stocks", "day_high REAL DEFAULT 0");
+ensureColumn("stocks", "day_low REAL DEFAULT 0");
+
+// 시장 상태(변동성 국면, 마지막 거래일) — 단일 행(id=1)
+db.exec(`
+  CREATE TABLE IF NOT EXISTS market_state (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    vol_mult REAL DEFAULT 1,
+    last_day TEXT
+  )
+`);
+db.prepare("INSERT OR IGNORE INTO market_state (id, vol_mult, last_day) VALUES (1, 1, NULL)").run();
 
 console.log("ℹ️ 마이그레이션 완료");
 
