@@ -5,7 +5,7 @@ const {
 } = require("discord.js");
 const { getUserOrFail } = require("../utils/user");
 const db = require("../../../Database");
-const { games } = require("../utils/gameState");
+const { games, saveGame, deleteGame } = require("../utils/gameState");
 const cache = require("../utils/cache");
 
 /** 게임 설정값 */
@@ -81,6 +81,7 @@ module.exports = {
         maxTries: 10,
         history: [],
       });
+      saveGame(interaction.user.id);
 
       // 게임 시작 안내 임베드
       return interaction.reply({
@@ -123,7 +124,7 @@ module.exports = {
         });
       }
 
-      games.delete(interaction.user.id); // 게임 상태 삭제
+      deleteGame(interaction.user.id); // 게임 상태 삭제
 
       return interaction.reply({
         embeds: [

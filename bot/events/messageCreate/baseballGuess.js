@@ -1,6 +1,6 @@
 const { EmbedBuilder } = require("discord.js");
 const db = require("../../../Database");
-const { games } = require("../../commands/utils/gameState"); // 경로가 프로젝트 구조에 따라 달라질 수 있음
+const { games, saveGame, deleteGame } = require("../../commands/utils/gameState");
 const { REWARD } = require("../../commands/game/baseball");
 const cache = require("../../commands/utils/cache");
 
@@ -22,6 +22,7 @@ module.exports = (client) => {
 
     game.history.push({ guess: content, s: strike, b: ball });
     if (game.history.length > 10) game.history.shift();
+    saveGame(message.author.id);
 
     const embed = new EmbedBuilder()
       .setColor(strike === 4 ? "#00cc99" : "#3498db")
@@ -53,7 +54,7 @@ module.exports = (client) => {
         .setDescription(`**${content}** → 4S 정답!\n${REWARD.toLocaleString()}원 지급됐어요! 🎉`)
         .addFields({ name: "💰 보상", value: `+${REWARD.toLocaleString()}원`, inline: true });
 
-      games.delete(message.author.id);
+      deleteGame(message.author.id);
     } else if (game.tries >= game.maxTries) {
       embed
         .setColor("#ff4444")
@@ -62,7 +63,7 @@ module.exports = (client) => {
         )
         .addFields({ name: "결과", value: "게임 종료", inline: true });
 
-      games.delete(message.author.id);
+      deleteGame(message.author.id);
     }
 
     await message.reply({ embeds: [embed] });

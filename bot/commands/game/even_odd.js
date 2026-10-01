@@ -50,13 +50,13 @@ module.exports = {
     const resultNum = Math.floor(Math.random() * 10) + 1;
     const result = resultNum % 2 === 0 ? "even" : "odd";
     const isWin = choice === result;
-    const reward = isWin ? bet * 2 : -bet; // 승리 시 2배, 패배 시 -베팅액
+    const reward = isWin ? bet : -bet; // 승리 시 베팅액만큼 순이익(원금 포함 2배), 패배 시 -베팅액
 
     // 돈 업데이트
     const newMoney = user.money + reward;
     if (newMoney < 0) throw new Error("잔액 부족으로 거래 실패");
-    db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
-      newMoney,
+    db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
+      reward,
       user.user_id,
     );
 

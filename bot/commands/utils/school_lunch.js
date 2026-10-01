@@ -84,7 +84,7 @@ module.exports = {
             "https://open.neis.go.kr/hub/mealServiceDietInfo",
             {
               params: {
-                KEY: process.env.NEIS_KEY,
+                KEY: process.env.NEIS_KEY || process.env.NEIS_TOKEN,
                 Type: "json",
                 ATPT_OFCDC_SC_CODE: "B10",
                 SD_SCHUL_CODE: "7011489",

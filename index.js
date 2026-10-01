@@ -81,9 +81,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     };
 
     // 응답 지연(defer) 상태에 따라 적절한 메서드로 에러 안내
-    if (interaction.replied || interaction.deferred)
-      await interaction.followUp(errorMsg);
-    else await interaction.editReply(errorMsg);
+    try {
+      if (interaction.replied || interaction.deferred)
+        await interaction.followUp(errorMsg);
+      else await interaction.reply(errorMsg);
+    } catch (e) {
+      console.error("에러 응답 실패:", e);
+    }
   }
 });
 
@@ -169,8 +173,9 @@ async function start() {
       setTimeout(() => process.exit(0), 1000); // 성공 종료
     } else {
       console.error("❌ 등록 실패! 프로세스 종료.");
-      setTimeout(() => process.exit(0), 1000); // 실패 종료
+      setTimeout(() => process.exit(1), 1000); // 실패 종료
     }
+    return; // 등록 후에는 봇 로그인하지 않음
   }
 
   // "--deploy" 옵션이 없을 때만 봇 로그인 수행
