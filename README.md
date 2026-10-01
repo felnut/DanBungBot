@@ -76,6 +76,7 @@ NEIS_KEY=나이스 API 키
 CLIENT_ID=봇 애플리케이션 ID
 GUILD_ID=운영서버 ID
 OWNER_ID=테스터 ID
+NOTICE_CHANNEL_ID=공지를 보낼 채널 ID (선택)
 ```
 
 ### `.env.test` (테스트용)
@@ -101,6 +102,7 @@ OWNER_ID=테스터_ID
 | `node index.js --test` | 테스트 봇 실행 | game-test.db |
 | `node index.js --deploy` | 실제 서버 슬래시 커맨드 등록 | game.db |
 | `node index.js --test --deploy` | 테스트 서버 슬래시 커맨드 등록 | game-test.db |
+| `node index.js --reset-stocks` | 주식 시장 1회성 초기화(백업 → 주가 기준가 복원 → 보유 주식 평가액 50% 현금 보상 → 공지 전송). 한 번만 실행되며 `--test`와 함께 쓰면 테스트 DB에 적용 | game.db |
 
 ---
 

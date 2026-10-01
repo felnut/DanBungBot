@@ -183,6 +183,9 @@ db.exec(`
   )
 `);
 db.prepare("INSERT OR IGNORE INTO market_state (id, vol_mult, last_day) VALUES (1, 1, NULL)").run();
+// 주식 시장 1회성 초기화(개편) 완료 여부와, 아직 전송하지 못한 공지(JSON)
+ensureColumn("market_state", "stock_reset_done INTEGER DEFAULT 0");
+ensureColumn("market_state", "reset_notice TEXT DEFAULT NULL");
 
 console.log("ℹ️ 마이그레이션 완료");
 

@@ -395,12 +395,27 @@ function getKST(date = new Date()) {
   };
 }
 
-/** 정규장 여부 */
+// 국경일(국경일에 관한 법률) 휴장. 설날·추석 등 명절은 휴장하지 않는다. 대체공휴일은 적용하지 않는다.
+const NATIONAL_HOLIDAYS = {
+  "03-01": "삼일절",
+  "07-17": "제헌절",
+  "08-15": "광복절",
+  "10-03": "개천절",
+  "10-09": "한글날",
+};
+
+/** 해당 날짜(KST)가 국경일이면 이름, 아니면 null */
+function getHolidayName(date = new Date()) {
+  return NATIONAL_HOLIDAYS[getKST(date).dayStr.slice(5)] || null;
+}
+
+/** 정규장 여부 (평일 09:00~15:30, 국경일 제외) */
 function isMarketOpen(date = new Date()) {
   const { weekday, minutes } = getKST(date);
   return (
     weekday >= 1 &&
     weekday <= 5 &&
+    !getHolidayName(date) &&
     minutes >= MARKET_OPEN_MIN &&
     minutes < MARKET_CLOSE_MIN
   );
@@ -414,7 +429,13 @@ function currentRegime() {
 /** 시장 상태 문구 */
 function getMarketStatus() {
   const open = isMarketOpen();
-  return { open, label: open ? "🟢 장중 (09:00~15:30)" : "🔴 장 마감 (시간외 종가 거래)" };
+  const holiday = getHolidayName();
+  const label = open
+    ? "🟢 장중 (09:00~15:30)"
+    : holiday
+      ? `🔴 휴장 (${holiday}) · 시간외 종가 거래`
+      : "🔴 장 마감 (시간외 종가 거래)";
+  return { open, label };
 }
 
 /** 새 거래일 시작: 어제 종가를 기록하고 전일 종가/시가/고가/저가를 초기화 */
@@ -427,16 +448,24 @@ function rolloverDay(dayStr) {
   stmtSetDay.run(dayStr);
 }
 
+// 최초 실행(또는 이전 주가 모델에서 넘어온 DB)이면 현재 가격을 전일 종가로 초기화
+if (!stmtMarketState.get().last_day) {
+  db.transaction(() => rolloverDay(getKST().dayStr))();
+}
+
 /**
  * 주가 한 틱 갱신 (TICK_MINUTES분마다 호출). 장이 닫혀 있으면 아무것도 하지 않는다.
  * @param {{force?: boolean}} [opts] force=true면 장 시간과 무관하게 한 틱 진행(관리자 테스트용)
  * @returns {boolean} 갱신 여부
  */
 async function updateStockPrices({ force = false } = {}) {
-  if (!force && !isMarketOpen()) return false;
+  // 타이머가 경계 시각보다 몇 ms 일찍 깨어나도 09:00 틱을 놓치지 않도록 5초 여유를 둔다
+  // (15:30 경계 틱은 15:29:55+5초 = 15:30:00으로 계산되어 마감 처리)
+  const at = new Date(Date.now() + 5000);
+  if (!force && !isMarketOpen(at)) return false;
 
   const nowSec = Math.floor(Date.now() / 1000);
-  const { dayStr } = getKST();
+  const { dayStr } = getKST(at);
 
   const tx = db.transaction(() => {
     // 새 거래일이면 일봉 롤오버
@@ -494,6 +523,124 @@ async function updateStockPrices({ force = false } = {}) {
   cache.del("stocks:recentNews");
   cache.del("leaderboard:stock_value:top10");
   return true;
+}
+
+// ── 주식 시장 1회성 초기화 (개편 이전 주가·보유 내역 정리) ──
+const RESET_COMPENSATION_RATE = 0.5; // 기존 보유 주식 평가액(수량 × 당시 주가)의 50%를 현금으로 보상
+
+/**
+ * 모든 종목 주가를 기준가로 되돌리고, 보유 주식은 평가액의 50%를 현금으로 보상한 뒤 삭제한다.
+ * 한 번만 실행되며(market_state.stock_reset_done), 실행 전 DB 전체를 백업 파일로 저장한다.
+ * @returns {null | {users:number, totalPaid:number, totalValue:number, backupPath:string}} 이미 실행했다면 null
+ */
+function resetStocksOnce() {
+  const state = db.prepare("SELECT stock_reset_done FROM market_state WHERE id = 1").get();
+  if (state.stock_reset_done) return null;
+
+  // 1) 백업 (트랜잭션 밖에서 실행해야 함)
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupPath = `${db.name}.pre-reset-${stamp}.bak`;
+  db.exec(`VACUUM INTO '${backupPath.replace(/'/g, "''")}'`);
+
+  let report = null;
+  db.transaction(() => {
+    // 2) 사용자별 보유 평가액 계산 (초기화 직전 주가 기준)
+    const rows = db
+      .prepare(
+        `SELECT us.user_id, us.shares, s.price
+         FROM user_stocks us JOIN stocks s ON us.symbol = s.symbol`,
+      )
+      .all();
+    const valueByUser = new Map();
+    for (const r of rows) {
+      valueByUser.set(r.user_id, (valueByUser.get(r.user_id) || 0) + r.shares * r.price);
+    }
+
+    // 3) 평가액의 50%를 현금으로 지급
+    let totalPaid = 0;
+    let totalValue = 0;
+    for (const [userId, value] of valueByUser) {
+      const payout = Math.floor(value * RESET_COMPENSATION_RATE);
+      stmtUpdateUserMoneyDelta.run(payout, userId);
+      totalPaid += payout;
+      totalValue += value;
+    }
+
+    // 4) 보유 내역 삭제, 주가·일봉·뉴스를 기준가로 초기화
+    db.prepare("DELETE FROM user_stocks").run();
+    for (const [symbol, info] of Object.entries(STOCKS)) {
+      db.prepare(
+        `UPDATE stocks SET price = ?, last_price = ?, day_open = ?, day_high = ?, day_low = ?,
+           history = '', last_change = 0, last_news_title = NULL, last_news_time = 0 WHERE symbol = ?`,
+      ).run(info.base, info.base, info.base, info.base, info.base, symbol);
+    }
+    stmtSetVol.run(1);
+    stmtSetDay.run(null);
+    rolloverDay(getKST().dayStr);
+
+    report = { users: valueByUser.size, totalPaid, totalValue, backupPath };
+    db.prepare(
+      "UPDATE market_state SET stock_reset_done = 1, reset_notice = ? WHERE id = 1",
+    ).run(JSON.stringify({ users: report.users, totalPaid, totalValue }));
+  })();
+
+  cache.del("stocks:snapshotRows");
+  cache.del("stocks:recentNews");
+  cache.del("leaderboard:stock_value:top10");
+  for (const k of ["leaderboard:money:top10"]) cache.del(k);
+  return report;
+}
+
+/** 아직 전송하지 못한 초기화 공지(없으면 null) */
+function getPendingResetNotice() {
+  const row = db.prepare("SELECT reset_notice FROM market_state WHERE id = 1").get();
+  return row?.reset_notice ? JSON.parse(row.reset_notice) : null;
+}
+
+function clearPendingResetNotice() {
+  db.prepare("UPDATE market_state SET reset_notice = NULL WHERE id = 1").run();
+}
+
+/** 초기화 공지 임베드 */
+function createStockResetNoticeEmbed(notice) {
+  const priceLines = Object.values(STOCKS)
+    .map((s) => `• ${s.name} ${s.base.toLocaleString()}원`)
+    .join("\n");
+  return new EmbedBuilder()
+    .setColor(0xf1c40f)
+    .setTitle("📢 주식 시장 개편 및 초기화 안내")
+    .setDescription(
+      "주식 시장이 **실제 증시와 비슷한 방식**으로 전면 개편되었습니다.\n" +
+        "이에 따라 모든 종목 주가를 초기화하고, 기존 보유 주식은 아래와 같이 정리했습니다.",
+    )
+    .addFields(
+      {
+        name: "🔄 초기화 내용",
+        value:
+          "• 모든 종목 주가가 기준가로 초기화되었습니다.\n" +
+          "• 기존 보유 주식은 모두 정리(삭제)되었습니다.",
+        inline: false,
+      },
+      {
+        name: "💰 보상",
+        value:
+          `• 보유하고 있던 주식 평가액(수량 × 초기화 직전 주가)의 **${RESET_COMPENSATION_RATE * 100}%**를 현금으로 지급했습니다.\n` +
+          `• 대상 ${notice.users.toLocaleString()}명 · 총 ${notice.totalPaid.toLocaleString()}원\n` +
+          "• 보유한 주식이 없던 분은 해당 없습니다. 잔액은 `/돈`으로 확인하세요.",
+        inline: false,
+      },
+      { name: "📈 새 기준가", value: priceLines, inline: false },
+      {
+        name: "🕘 달라진 점",
+        value:
+          "• 장 시간: 평일 09:00~15:30 (10분마다 시세 갱신), 그 외에는 종가로 거래\n" +
+          "• 국경일(삼일절·제헌절·광복절·개천절·한글날)은 휴장\n" +
+          "• 시장 분위기·종목별 민감도(베타)·전일 대비 ±30% 가격 제한폭·단붕 지수 도입",
+        inline: false,
+      },
+    )
+    .setFooter({ text: "/주식 주가 로 시황 확인 · /주식 내주식 으로 자산 확인" })
+    .setTimestamp();
 }
 
 /**
@@ -682,7 +829,7 @@ function createStockUpdateEmbed() {
   }
 
   embed.setFooter({
-    text: "전일 종가 대비 · 10분마다 갱신(장중) · 가격 제한폭 ±30%",
+    text: "전일 종가 대비 · 10분마다 갱신(장중) · 가격 제한폭 ±30% · 국경일 휴장",
   });
   embed.setTimestamp();
 
@@ -784,6 +931,11 @@ function getStocksForAutocomplete() {
 
 module.exports = {
   TICK_MINUTES,
+  resetStocksOnce,
+  getPendingResetNotice,
+  clearPendingResetNotice,
+  createStockResetNoticeEmbed,
+  getHolidayName,
   isMarketOpen,
   getMarketStatus,
   updateStockPrices,
