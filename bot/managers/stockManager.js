@@ -40,7 +40,7 @@ const stmtDeleteHolding = db.prepare(
 );
 
 const stmtSelectStocksForEmbed = db.prepare(
-  "SELECT id, symbol, name, price, last_change, last_news_title, last_news_time FROM stocks ORDER BY id ASC",
+  "SELECT id, symbol, name, price, last_price, day_open, day_high, day_low, history, last_change, last_news_title, last_news_time FROM stocks ORDER BY id ASC",
 );
 const stmtSelectRecentNews = db.prepare(`
       SELECT name, last_news_title, last_news_time 
@@ -329,13 +329,14 @@ const NEWS_POOL = {
 
 // 종목 시작
 const STOCKS = {
-  hys: { name: "한양반도체", base_t: 0.0012, news: 1.4 },
-  ftc: { name: "퓨처캐피탈", base_t: 0.0008, news: 1.2 },
-  djc: { name: "대진건설", base_t: 0.0006, news: 1.1 },
-  hgf: { name: "한그린푸드", base_t: 0.0009, news: 1.3 },
-  bhx: { name: "바이오헬릭스", base_t: 0.0018, news: 1.6 },
-  msd: { name: "마이크로스터디", base_t: 0.001, news: 1.25 },
-  sgmn: { name: "서재미나이", base_t: 0.0015, news: 1.45 },
+  // vol: 종목 고유 변동성, beta: 시장 전체 움직임에 대한 민감도, base: 지수 기준가
+  hys: { name: "한양반도체", base_t: 0.0012, news: 1.4, vol: 1.0, beta: 1.3, base: 145000 },
+  ftc: { name: "퓨처캐피탈", base_t: 0.0008, news: 1.2, vol: 0.8, beta: 1.1, base: 82000 },
+  djc: { name: "대진건설", base_t: 0.0006, news: 1.1, vol: 0.6, beta: 0.9, base: 39500 },
+  hgf: { name: "한그린푸드", base_t: 0.0009, news: 1.3, vol: 0.7, beta: 0.5, base: 24800 },
+  bhx: { name: "바이오헬릭스", base_t: 0.0018, news: 1.6, vol: 1.6, beta: 1.0, base: 168000 },
+  msd: { name: "마이크로스터디", base_t: 0.001, news: 1.25, vol: 1.1, beta: 0.8, base: 91000 },
+  sgmn: { name: "서재미나이", base_t: 0.0015, news: 1.45, vol: 1.4, beta: 1.4, base: 132000 },
 };
 //종목 끝
 
@@ -343,43 +344,145 @@ const STOCKS = {
  * 주가 랜덤 변동 + 뉴스 이벤트 적용
  * (주기적으로 호출됨 - 보통 setInterval로)
  */
-async function updateStockPrices() {
+// ── 주가 모델: 실제 증시처럼 동작 ──
+// • 정규장: 평일 09:00~15:30(KST)에만 시세가 움직인다. 그 외(장 마감·주말)에는 마지막 종가가 유지되고,
+//   거래는 항상 가능(시간외 종가 거래).
+// • 시장 공통 요인(시장 전체의 움직임)에 종목별 베타를 곱한 값 + 종목 고유 움직임(+뉴스)으로 구성된다.
+// • 변동성 국면(평온/보통/불안)이 가끔 바뀌어 변동성이 한동안 지속된다(변동성 군집).
+// • 전일 종가 대비 ±30% 가격 제한폭(상한가/하한가), 매 거래일 시가·고가·저가·종가 기록.
+// • 모든 움직임의 상승 확률은 49.5% : 하락 50.5% → 큰 수의 법칙으로 장기 보유할수록 소폭 손해(하우스 엣지 1%).
+const TICK_MINUTES = 10;
+const UP_PROB = 0.495;
+const BASE_STEP = 0.0028; // 종목 고유 틱 변동폭 (vol 곱함)
+const MARKET_STEP = 0.002; // 시장 공통 틱 변동폭 (beta 곱함)
+const NEWS_PROB = 0.02; // 틱당 뉴스 발생 확률
+const NEWS_STEP = 0.02; // 뉴스 틱 고유 변동폭
+const DAILY_LIMIT = 0.3; // 가격 제한폭 (전일 종가 대비)
+const MARKET_OPEN_MIN = 9 * 60; // 09:00
+const MARKET_CLOSE_MIN = 15 * 60 + 30; // 15:30
+const REGIMES = [
+  { mult: 0.7, label: "😌 평온" },
+  { mult: 1.0, label: "🙂 보통" },
+  { mult: 1.0, label: "🙂 보통" },
+  { mult: 1.6, label: "😰 불안" },
+];
+const REGIME_SWITCH_PROB = 0.02; // 틱당 국면 전환 확률
+
+// market_state 테이블과 stocks.day_open/day_high/day_low 컬럼은 Database.js 마이그레이션에서 생성된다.
+const stmtMarketState = db.prepare("SELECT vol_mult, last_day FROM market_state WHERE id = 1");
+const stmtSetVol = db.prepare("UPDATE market_state SET vol_mult = ? WHERE id = 1");
+const stmtSetDay = db.prepare("UPDATE market_state SET last_day = ? WHERE id = 1");
+const stmtAllForTick = db.prepare(
+  "SELECT symbol, price, last_price, day_open, day_high, day_low, history FROM stocks",
+);
+const stmtRollover = db.prepare(
+  "UPDATE stocks SET last_price = price, day_open = price, day_high = price, day_low = price, history = ? WHERE symbol = ?",
+);
+const stmtTickNoNews = db.prepare(
+  "UPDATE stocks SET price = ?, last_change = ?, day_high = ?, day_low = ? WHERE symbol = ?",
+);
+const stmtTickWithNews = db.prepare(
+  "UPDATE stocks SET price = ?, last_change = ?, day_high = ?, day_low = ?, last_news_title = ?, last_news_time = ? WHERE symbol = ?",
+);
+
+/** 한국 표준시(KST) 시각 정보 (UTC getter로 읽는다) */
+function getKST(date = new Date()) {
+  const k = new Date(date.getTime() + 9 * 60 * 60 * 1000);
+  return {
+    dayStr: k.toISOString().slice(0, 10),
+    weekday: k.getUTCDay(), // 0=일 ... 6=토
+    minutes: k.getUTCHours() * 60 + k.getUTCMinutes(),
+  };
+}
+
+/** 정규장 여부 */
+function isMarketOpen(date = new Date()) {
+  const { weekday, minutes } = getKST(date);
+  return (
+    weekday >= 1 &&
+    weekday <= 5 &&
+    minutes >= MARKET_OPEN_MIN &&
+    minutes < MARKET_CLOSE_MIN
+  );
+}
+
+function currentRegime() {
+  const { vol_mult } = stmtMarketState.get();
+  return REGIMES.find((r) => r.mult === vol_mult) || REGIMES[1];
+}
+
+/** 시장 상태 문구 */
+function getMarketStatus() {
+  const open = isMarketOpen();
+  return { open, label: open ? "🟢 장중 (09:00~15:30)" : "🔴 장 마감 (시간외 종가 거래)" };
+}
+
+/** 새 거래일 시작: 어제 종가를 기록하고 전일 종가/시가/고가/저가를 초기화 */
+function rolloverDay(dayStr) {
+  const rows = stmtAllForTick.all();
+  for (const r of rows) {
+    const hist = (r.history ? r.history.split(",").filter(Boolean) : []).concat(String(r.price));
+    stmtRollover.run(hist.slice(-20).join(","), r.symbol);
+  }
+  stmtSetDay.run(dayStr);
+}
+
+/**
+ * 주가 한 틱 갱신 (TICK_MINUTES분마다 호출). 장이 닫혀 있으면 아무것도 하지 않는다.
+ * @param {{force?: boolean}} [opts] force=true면 장 시간과 무관하게 한 틱 진행(관리자 테스트용)
+ * @returns {boolean} 갱신 여부
+ */
+async function updateStockPrices({ force = false } = {}) {
+  if (!force && !isMarketOpen()) return false;
+
   const nowSec = Math.floor(Date.now() / 1000);
+  const { dayStr } = getKST();
 
   const tx = db.transaction(() => {
-    const stocks = stmtSelectAllStocks.all();
-    for (const stock of stocks) {
+    // 새 거래일이면 일봉 롤오버
+    if (stmtMarketState.get().last_day !== dayStr) rolloverDay(dayStr);
+
+    // 변동성 국면 전환
+    if (Math.random() < REGIME_SWITCH_PROB) {
+      stmtSetVol.run(REGIMES[Math.floor(Math.random() * REGIMES.length)].mult);
+    }
+    const regime = stmtMarketState.get().vol_mult;
+
+    // 시장 공통 요인 (모든 종목에 beta를 곱해 반영)
+    const marketUp = Math.random() < UP_PROB;
+    const marketRet =
+      (marketUp ? 1 : -1) * MARKET_STEP * regime * (0.5 + Math.random());
+
+    for (const stock of stmtAllForTick.all()) {
       const info = STOCKS[stock.symbol];
       if (!info) continue;
 
-      // 기본 변동률 (가우시안 분포 비슷하게)
-      let change = (Math.random() - 0.5) * 0.015;
-
+      // 종목 고유 요인 (+ 방향에 맞는 뉴스)
+      const up = Math.random() < UP_PROB;
       let news = null;
-      if (Math.random() < 0.25) {
-        news = getRandomNews(stock.symbol);
-        if (news) {
-          const impact =
-            news.impactMin + Math.random() * (news.impactMax - news.impactMin);
-          change += impact;
-        }
-      }
+      if (Math.random() < NEWS_PROB) news = getRandomNews(stock.symbol, up);
+      const idioStep = news
+        ? NEWS_STEP * info.vol * (0.7 + 0.6 * Math.random())
+        : BASE_STEP * info.vol * regime * (0.5 + Math.random());
+      const change = (info.beta ?? 1) * marketRet + (up ? idioStep : -idioStep);
 
-      const newPrice = Math.max(
-        Math.round(stock.price * (1 + change)),
-        Math.round(stock.price * 0.1),
+      // 전일 종가 대비 가격 제한폭 적용
+      const prevClose = stock.last_price || stock.price;
+      const lower = Math.max(Math.round(prevClose * (1 - DAILY_LIMIT)), 1);
+      const upper = Math.round(prevClose * (1 + DAILY_LIMIT));
+      const newPrice = Math.min(
+        Math.max(Math.round(stock.price * (1 + change)), lower),
+        upper,
       );
 
+      const high = Math.max(stock.day_high || stock.price, newPrice);
+      const low = Math.min(stock.day_low || stock.price, newPrice);
+      const realized = stock.price > 0 ? newPrice / stock.price - 1 : 0;
+
       if (news) {
-        stmtUpdateStockWithNews.run(
-          newPrice,
-          change,
-          news.title,
-          nowSec,
-          stock.symbol,
-        );
+        stmtTickWithNews.run(newPrice, realized, high, low, news.title, nowSec, stock.symbol);
       } else {
-        stmtUpdateStockNoNews.run(newPrice, change, stock.symbol);
+        stmtTickNoNews.run(newPrice, realized, high, low, stock.symbol);
       }
     }
   });
@@ -390,13 +493,16 @@ async function updateStockPrices() {
   cache.del("stocks:snapshotRows");
   cache.del("stocks:recentNews");
   cache.del("leaderboard:stock_value:top10");
+  return true;
 }
 
 /**
- * 종목별 랜덤 뉴스 가져오기
+ * 종목별 랜덤 뉴스 가져오기 (up=true: 호재, false: 악재)
  */
-function getRandomNews(symbol) {
-  const pool = NEWS_POOL[symbol] || [];
+function getRandomNews(symbol, up) {
+  const pool = (NEWS_POOL[symbol] || []).filter((n) =>
+    up ? n.impactMin + n.impactMax > 0 : n.impactMin + n.impactMax < 0,
+  );
   if (pool.length === 0) return null;
   return pool[Math.floor(Math.random() * pool.length)];
 }
@@ -472,6 +578,38 @@ function sellStock(userId, symbol, quantity) {
 // 임베드 생성 헬퍼 함수들
 // ────────────────────────────────────────────────
 
+const SPARK = "▁▂▃▄▅▆▇█";
+/** 숫자 배열을 ▁▂▃▅▇ 형태의 미니 차트로 변환 */
+function sparkline(values) {
+  if (values.length < 2) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  if (max === min) return SPARK[3].repeat(values.length);
+  return values
+    .map((v) => SPARK[Math.min(7, Math.floor(((v - min) / (max - min)) * 8))])
+    .join("");
+}
+
+function fmtPct(rate) {
+  const pct = (rate * 100).toFixed(2);
+  const arrow = rate > 0 ? "🔺" : rate < 0 ? "🔻" : "▬";
+  return `${arrow} ${rate > 0 ? "+" : ""}${pct}%`;
+}
+
+/** 단붕 지수: 7종목 기준가 대비 평균 × 1000 */
+function computeIndex(stocks, usePrev) {
+  let sum = 0;
+  let n = 0;
+  for (const s of stocks) {
+    const base = STOCKS[s.symbol]?.base;
+    if (!base) continue;
+    const p = usePrev ? s.last_price || s.price : s.price;
+    sum += p / base;
+    n += 1;
+  }
+  return n ? (sum / n) * 1000 : 0;
+}
+
 function createStockUpdateEmbed() {
   let stocks = cache.get("stocks:snapshotRows");
   if (!stocks) {
@@ -479,36 +617,40 @@ function createStockUpdateEmbed() {
     cache.set("stocks:snapshotRows", stocks, 30000);
   }
 
+  const status = getMarketStatus();
+  const regime = currentRegime();
+  const idx = computeIndex(stocks, false);
+  const prevIdx = computeIndex(stocks, true);
+  const idxRate = prevIdx > 0 ? idx / prevIdx - 1 : 0;
+
   const embed = new EmbedBuilder()
     .setColor(0x00aa99)
-    .setTitle("📈 주식 시장 실시간 시황");
+    .setTitle("📈 주식 시장 시황")
+    .setDescription(
+      `**${status.label}** · 시장 분위기 ${regime.label}\n` +
+        `📊 **단붕 지수 ${idx.toFixed(1)}** (${fmtPct(idxRate)})`,
+    );
 
-  // 제목 후 구분선
-  embed.addFields({
-    name: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    value: "",
-    inline: false,
-  });
-
-  // 종목 세로 배치
   stocks.forEach((s) => {
-    const change = (s.last_change * 100).toFixed(1);
-    const arrow = change >= 0 ? "🔺" : "🔻";
-    const sign = change >= 0 ? "+" : "";
     const name = s.name || STOCKS[s.symbol]?.name || s.symbol;
+    const prev = s.last_price || s.price;
+    const rate = prev > 0 ? s.price / prev - 1 : 0;
+    const limit = s.price >= Math.round(prev * (1 + DAILY_LIMIT)) ? " 🚫상한가" : s.price <= Math.max(Math.round(prev * (1 - DAILY_LIMIT)), 1) ? " 🚫하한가" : "";
+    const hist = (s.history ? s.history.split(",").filter(Boolean).map(Number) : []).slice(-9);
+    const chart = sparkline([...hist, s.price]);
+    const range =
+      s.day_high && s.day_low
+        ? `고 ${s.day_high.toLocaleString()} · 저 ${s.day_low.toLocaleString()}`
+        : "";
 
     embed.addFields({
-      name: '',
-      value: `**${name} (${s.symbol.toUpperCase()})\n${arrow}${sign}${change}%\n${s.price.toLocaleString()}원**`,
+      name: `${name} (${s.symbol.toUpperCase()})`,
+      value:
+        `**${s.price.toLocaleString()}원** ${fmtPct(rate)}${limit}\n` +
+        (chart ? `\`${chart}\` ` : "") +
+        range,
       inline: false,
     });
-  });
-
-  // 주식 후 구분선
-  embed.addFields({
-    name: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    value: "",
-    inline: false,
   });
 
   // 최근 뉴스
@@ -524,49 +666,25 @@ function createStockUpdateEmbed() {
       hour: "2-digit",
       minute: "2-digit",
       hour12: false,
+      timeZone: "Asia/Seoul",
     });
-
-    embed.addFields(
-      {
-        name: "**📰 최근 주요 뉴스**",
-        value: "",
-        inline: false,
-      },
-      {
-        name: `[${recentNews.name}]`,
-        value: `${recentNews.last_news_title}\n${timeStr}`,
-        inline: false,
-      },
-    );
+    embed.addFields({
+      name: `📰 [${recentNews.name}] 최근 주요 뉴스`,
+      value: `${recentNews.last_news_title}\n${timeStr}`,
+      inline: false,
+    });
   } else {
     embed.addFields({
-      name: "**📰 최근 주요 뉴스**",
+      name: "📰 최근 주요 뉴스",
       value: "최근 뉴스가 없습니다.",
       inline: false,
     });
   }
 
-  // 뉴스 후 구분선
-  embed.addFields({
-    name: "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━",
-    value: "",
-    inline: false,
-  });
-
-  // footer 시간
-  const now = new Date();
-  const timeStr = now
-    .toLocaleTimeString("ko-KR", {
-      hour: "numeric",
-      minute: "2-digit",
-      hour12: true,
-    })
-    .replace("오전 ", "오전 ")
-    .replace("오후 ", "오후 ");
-
   embed.setFooter({
-    text: `💡 /주식 주가 로 상세 차트 확인 가능 • 실시간 갱신 • 오늘 ${timeStr}`,
+    text: "전일 종가 대비 · 10분마다 갱신(장중) · 가격 제한폭 ±30%",
   });
+  embed.setTimestamp();
 
   return embed;
 }
@@ -665,6 +783,9 @@ function getStocksForAutocomplete() {
 }
 
 module.exports = {
+  TICK_MINUTES,
+  isMarketOpen,
+  getMarketStatus,
   updateStockPrices,
   buyStock,
   sellStock,

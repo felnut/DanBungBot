@@ -1,7 +1,7 @@
 const { EmbedBuilder } = require("discord.js");
 const db = require("../../../Database");
 const { games, saveGame, deleteGame } = require("../../commands/utils/gameState");
-const { REWARD } = require("../../commands/game/baseball");
+const { rewardFor } = require("../../commands/game/baseball");
 const cache = require("../../commands/utils/cache");
 
 module.exports = (client) => {
@@ -41,9 +41,10 @@ module.exports = (client) => {
       });
 
     if (strike === 4) {
+      const reward = rewardFor(game.tries);
       const changes = db
         .prepare("UPDATE user SET money = money + ? WHERE user_id = ?")
-        .run(REWARD, message.author.id).changes;
+        .run(reward, message.author.id).changes;
       if (!changes) return; // safety
 
       cache.del(`leaderboard:money:myRank:${message.author.id}`);
@@ -51,8 +52,8 @@ module.exports = (client) => {
 
       embed
         .setColor("#57f287")
-        .setDescription(`**${content}** → 4S 정답!\n${REWARD.toLocaleString()}원 지급됐어요! 🎉`)
-        .addFields({ name: "💰 보상", value: `+${REWARD.toLocaleString()}원`, inline: true });
+        .setDescription(`**${content}** → 4S 정답!\n${reward.toLocaleString()}원 지급됐어요! 🎉`)
+        .addFields({ name: "💰 보상", value: `+${reward.toLocaleString()}원`, inline: true });
 
       deleteGame(message.author.id);
     } else if (game.tries >= game.maxTries) {

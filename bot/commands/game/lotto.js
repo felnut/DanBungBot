@@ -11,16 +11,27 @@ const db = require("../../../Database");
 const { getUserOrFail } = require("../utils/user");
 const cache = require("../utils/cache");
 
-// 프리컴퓨트 (매 실행마다 동일 계산 반복 방지)
-// 기대 당첨금 ≈ 465원 (복권값 500원보다 낮게 유지 → 경제 인플레이션 방지)
-const LOTTO_AMOUNTS = Array.from({ length: 500 }, (_, i) => 100 * (i + 1));
-const LOTTO_WEIGHTS = LOTTO_AMOUNTS.map((a) => Math.pow(50000 / a, 1.95));
-const LOTTO_TOTAL_WEIGHT = LOTTO_WEIGHTS.reduce((sum, w) => sum + w, 0);
+// 당첨 구성표 [금액, 확률]. 기대 당첨금 ≈ 493원 (복권값 500원 → 환수율 약 98.6%, 하우스 엣지 약 1.4%)
+// 손실(<500원) 52% / 본전(500원) 12% / 이익(>500원) 36% → 잃고 얻는 빈도가 균형을 이룸
+const LOTTO_TABLE = [
+  [200, 0.32],
+  [300, 0.2],
+  [500, 0.12],
+  [600, 0.15],
+  [700, 0.067],
+  [800, 0.09],
+  [1200, 0.04],
+  [2500, 0.01],
+  [6000, 0.0025],
+  [20000, 0.0004],
+  [50000, 0.00008],
+];
+const LOTTO_TOTAL = LOTTO_TABLE.reduce((sum, [, p]) => sum + p, 0);
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("복권")
-    .setDescription("500원으로 복권을 구매합니다. (100~50,000원 당첨)"),
+    .setDescription("500원으로 복권을 구매합니다. (200~50,000원 당첨)"),
 
   async execute(interaction) {
     await interaction.deferReply();
@@ -49,14 +60,13 @@ module.exports = {
 
     // ==================== 당첨금 뽑기 (가중치 적용) ====================
     // 낮은 금액이 더 잘 나오게 설계된 가중치 랜덤
-    let rand = Math.random() * LOTTO_TOTAL_WEIGHT;
-    let sum = 0;
-    let prize = 500;
+    let rand = Math.random() * LOTTO_TOTAL;
+    let prize = LOTTO_TABLE[0][0];
 
-    for (let i = 0; i < LOTTO_AMOUNTS.length; i++) {
-      sum += LOTTO_WEIGHTS[i];
-      if (rand <= sum) {
-        prize = LOTTO_AMOUNTS[i];
+    for (const [amount, p] of LOTTO_TABLE) {
+      rand -= p;
+      if (rand <= 0) {
+        prize = amount;
         break;
       }
     }
@@ -65,7 +75,7 @@ module.exports = {
     const buyEmbed = new EmbedBuilder()
       .setTitle("🎫 복권 구매 완료!")
       .setColor("#FFD700")
-      .setDescription("버튼 눌러서 복권 긁어보세요!\n낮은 금액이 더 잘 나와요~ (100 ~ 50,000원)")
+      .setDescription("버튼 눌러서 복권 긁어보세요!\n낮은 금액이 더 잘 나와요~ (200 ~ 50,000원)")
       .addFields(
         {
           name: "🧾 결제",
@@ -100,15 +110,6 @@ module.exports = {
       claimed = true;
       await i.deferUpdate();
 
-      // 긁는 중 애니메이션
-      const scratchingEmbed = new EmbedBuilder()
-        .setTitle("🔥 복권 긁는 중...")
-        .setColor("#FFAA00")
-        .setDescription("두구두구...");
-
-      await message.edit({ embeds: [scratchingEmbed], components: [] });
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-
       // 당첨금 지급
       db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
         prize,
@@ -135,7 +136,7 @@ module.exports = {
 
     // 시간 초과 시 환불
     collector.on("end", async (collected, reason) => {
-      if (reason === "time") {
+      if (reason === "time" && !claimed) {
         db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
           useFee,
           user.user_id,

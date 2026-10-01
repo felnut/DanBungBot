@@ -23,6 +23,7 @@ const client = new Client({
 const {
   updateStockPrices,
   createStockUpdateEmbed,
+  TICK_MINUTES,
 } = require("./bot/managers/stockManager");
 
 // DB 자동 연결 (초기화 및 마이그레이션 실행)
@@ -107,30 +108,23 @@ client.once(Events.ClientReady, (c) => {
     return new Date(Date.now() + 9 * 60 * 60 * 1000);
   }
 
-  // ================== 정시마다 동작하는 스케줄러 로직 ==================
+  // ================== TICK_MINUTES분 간격(정각 기준 정렬) 스케줄러 ==================
   function startScheduler() {
-    const now = getKSTNow();
+    const tickMs = TICK_MINUTES * 60 * 1000;
+    let delayMs = tickMs - (Date.now() % tickMs); // 다음 경계(예: 10분 단위)까지 남은 시간
 
-    let nextHour = new Date(now);
-    nextHour.setHours(now.getHours() + 1, 0, 0, 0); // 다음 정각으로 설정
+    // 경계 직후(30초 이내) 켜졌을 때 즉시 연속 실행되는 것을 방지하기 위해 한 틱 스킵
+    if (delayMs < 30 * 1000) delayMs += tickMs;
 
-    let delayMs = nextHour - now;
-
-    // 정각 직후(30초 이내) 켜졌을 때 즉시 연속 실행되는 것을 방지하기 위해 1시간 스킵
-    if (delayMs < 30 * 1000) {
-      nextHour.setHours(nextHour.getHours() + 1);
-      delayMs = nextHour - now;
-    }
-
+    const next = new Date(Date.now() + delayMs);
     console.log(
-      `다음 주가 업데이트 (KST): ${nextHour.toLocaleString("ko-KR")} ` +
+      `다음 주가 업데이트: ${next.toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })} ` +
         `(약 ${Math.round(delayMs / 60000)}분 ${Math.round((delayMs % 60000) / 1000)}초 후)`,
     );
 
-    // 계산된 대기 시간(delayMs) 후에 주가 업데이트 로직을 수행
     setTimeout(async () => {
       await performUpdate();
-      startScheduler(); // 실행 후 다음 정각을 위해 재귀 호출(무한 반복)
+      startScheduler(); // 실행 후 다음 경계를 위해 재귀 호출(무한 반복)
     }, delayMs);
   }
 

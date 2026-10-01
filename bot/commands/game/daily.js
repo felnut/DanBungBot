@@ -7,6 +7,9 @@ const db = require("../../../Database");
 const { getUserOrFail } = require("../utils/user");
 const cache = require("../utils/cache");
 
+const RESCUE_THRESHOLD = 1000;
+const RESCUE_MAX = 700;
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("출석")
@@ -60,7 +63,12 @@ module.exports = {
     const baseReward = Math.floor(Math.random() * 201) + 150;
     const multiplier = Math.floor(newStreak / 10);
     const streakBonus = Math.round(baseReward * 0.3 * multiplier);
-    const totalReward = baseReward + streakBonus;
+    // 파산 방지: 잔액이 RESCUE_THRESHOLD 미만이면 부족분을 보충 (최대 RESCUE_MAX)
+    const rescue =
+      user.money < RESCUE_THRESHOLD
+        ? Math.min(RESCUE_MAX, RESCUE_THRESHOLD - user.money)
+        : 0;
+    const totalReward = baseReward + streakBonus + rescue;
 
     // DB 업데이트 (돈 + 출석 기록)
     const newMoney = user.money + totalReward;
@@ -78,7 +86,9 @@ module.exports = {
       .setDescription(
         `**${kstNow.toLocaleDateString("ko-KR")}** 출석 인정!\n\n` +
           `기본 보상: **${baseReward.toLocaleString()} 원**\n` +
-          `연속 보너스: **${streakBonus.toLocaleString()} 원**\n\n` +
+          `연속 보너스: **${streakBonus.toLocaleString()} 원**\n` +
+          (rescue > 0 ? `🆘 파산 방지 지원금: **${rescue.toLocaleString()} 원**\n` : "") +
+          "\n" +
           `🎉 총 **${totalReward.toLocaleString()} 원** 받았어요!`,
       )
       .addFields(
