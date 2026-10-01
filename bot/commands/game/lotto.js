@@ -12,14 +12,15 @@ const { getUserOrFail } = require("../utils/user");
 const cache = require("../utils/cache");
 
 // 프리컴퓨트 (매 실행마다 동일 계산 반복 방지)
-const LOTTO_AMOUNTS = Array.from({ length: 100 }, (_, i) => 500 * (i + 1));
-const LOTTO_WEIGHTS = LOTTO_AMOUNTS.map((a) => Math.pow(55000 / a, 1.87));
+// 기대 당첨금 ≈ 465원 (복권값 500원보다 낮게 유지 → 경제 인플레이션 방지)
+const LOTTO_AMOUNTS = Array.from({ length: 500 }, (_, i) => 100 * (i + 1));
+const LOTTO_WEIGHTS = LOTTO_AMOUNTS.map((a) => Math.pow(50000 / a, 1.95));
 const LOTTO_TOTAL_WEIGHT = LOTTO_WEIGHTS.reduce((sum, w) => sum + w, 0);
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("복권")
-    .setDescription("500원으로 복권을 구매합니다.(꽝 없음)"),
+    .setDescription("500원으로 복권을 구매합니다. (100~50,000원 당첨)"),
 
   async execute(interaction) {
     await interaction.deferReply();
@@ -64,7 +65,7 @@ module.exports = {
     const buyEmbed = new EmbedBuilder()
       .setTitle("🎫 복권 구매 완료!")
       .setColor("#FFD700")
-      .setDescription("버튼 눌러서 복권 긁어보세요!\n낮은 금액이 더 잘 나와요~")
+      .setDescription("버튼 눌러서 복권 긁어보세요!\n낮은 금액이 더 잘 나와요~ (100 ~ 50,000원)")
       .addFields(
         {
           name: "🧾 결제",
@@ -93,7 +94,10 @@ module.exports = {
       time: 60000,
     });
 
+    let claimed = false; // 중복 클릭으로 당첨금이 두 번 지급되는 것 방지
     collector.on("collect", async (i) => {
+      if (claimed) return;
+      claimed = true;
       await i.deferUpdate();
 
       // 긁는 중 애니메이션
@@ -106,17 +110,17 @@ module.exports = {
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
       // 당첨금 지급
-      const newMoney = user.money + prize;
-      db.prepare("UPDATE user SET money = ? WHERE user_id = ?").run(
-        newMoney,
+      db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?").run(
+        prize,
         user.user_id,
       );
+      const newMoney = user.money + prize;
       cache.del(`leaderboard:money:myRank:${user.user_id}`);
       cache.del("leaderboard:money:top10");
 
       const resultEmbed = new EmbedBuilder()
         .setTitle("💰 당첨 결과!")
-        .setColor(prize >= 10000 ? "#00FF88" : "#88DDFF")
+        .setColor(prize >= 10000 ? "#00FF88" : prize >= 500 ? "#88DDFF" : "#AAAAAA")
         .setDescription(`🎉 **${prize.toLocaleString()}원** 당첨!! 축하해요!`)
         .addFields({
           name: "현재 잔액",
