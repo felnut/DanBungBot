@@ -49,7 +49,8 @@ module.exports = {
 
   async execute(interaction) {
     try {
-      await interaction.deferReply();
+      // "생각 중…" 표시 대신 즉시 응답하고, 결과가 나오면 이 메시지를 수정한다
+      await interaction.reply("🍽️ 급식 정보를 불러오는 중…");
 
       const now = new Date();
       const dateKeyword = interaction.options.getString("날짜");
@@ -117,7 +118,7 @@ module.exports = {
         .setThumbnail("https://cdn-icons-png.flaticon.com/512/3480/3480823.png")
         .setTimestamp();
 
-      await interaction.editReply({ embeds: [mealEmbed] });
+      await interaction.editReply({ content: "", embeds: [mealEmbed] });
     } catch (error) {
       console.error(error);
       await interaction.editReply("🚨 급식을 불러오는 중에 오류가 발생했습니다.");

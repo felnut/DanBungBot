@@ -130,12 +130,26 @@ OWNER_ID=테스터_ID
    LAVALINK_HOST=127.0.0.1
    LAVALINK_PORT=2333
    LAVALINK_PASSWORD=application.yml의 password와 같은 값
-   YTDLP_PATH=yt-dlp (전체 경로 가능)
+   YTDLP_PATH=yt-dlp (전체 경로 가능, 아래 빠른 방식이 없을 때만 사용)
    ```
-4. `music/start.bat`으로 Lavalink를 켠 뒤 `node index.js`로 봇을 켭니다.
-5. `/음악 재생 검색어:... [소스:사운드클라우드|유튜브]`로 재생합니다. 허용 링크는 유튜브·사운드클라우드·밴드캠프·트위치·비메오뿐입니다.
+4. (권장) yt-dlp를 상시 워커로 쓰면 유튜브 곡 추출이 약 4.4초 → 약 2초로 빨라집니다. exe는 실행할 때마다 약 3초의 시작 비용이 들기 때문입니다. Python 3.10 이상이 필요합니다.
+   ```bash
+   python -m venv music/tools/ytdlp-venv
+   music/tools/ytdlp-venv/Scripts/python.exe -m pip install yt-dlp   # Linux/macOS: bin/python
+   ```
+   이 가상환경이 있으면 봇이 `music/ytdlp_worker.py`를 자동으로 띄우고, 없으면 `YTDLP_PATH`의 실행 파일로 동작합니다. (`YTDLP_USE_WORKER=0`이면 항상 실행 파일 사용)
+5. `music/start.bat`으로 Lavalink를 켠 뒤 `node index.js`로 봇을 켭니다.
+6. `/음악 재생 검색어:... [소스:사운드클라우드|유튜브]`로 재생합니다. 허용 링크는 유튜브·사운드클라우드·밴드캠프·트위치·비메오뿐입니다.
 
-유튜브가 막히면 `yt-dlp -U`로 업데이트하세요. Lavalink 유튜브 플러그인은 현재 봇 차단으로 쓰지 않습니다.
+유튜브 곡은 처음 재생할 때 스트림으로 바로 재생하면서 `music/cache/`에 음원 파일을 저장하고, 같은 곡(같은 링크·검색어)은 `yt-dlp` 호출 없이 저장본으로 즉시 재생합니다. 저장본은 봇이 `127.0.0.1:2334`에 여는 로컬 파일 서버를 통해 Lavalink가 읽습니다.
+
+| 환경 변수 | 기본값 | 설명 |
+|---|---|---|
+| `MUSIC_CACHE_MAX_MB` | 2048 | 캐시 총 용량. 넘으면 오래 안 쓴 곡부터 삭제. `0`이면 캐시 끔 |
+| `MUSIC_CACHE_MAX_MINUTES` | 30 | 이보다 긴 영상·라이브는 저장하지 않음 |
+| `MUSIC_CACHE_PORT` | 2334 | 로컬 파일 서버 포트 |
+
+캐시를 비우려면 `music/cache/` 폴더를 지우면 됩니다. 유튜브 추출이 실패하면 `yt-dlp`를 자동으로 업데이트(가상환경이면 `pip install -U yt-dlp`)한 뒤 한 번 재시도하며, Lavalink 유튜브 플러그인은 봇 차단으로 쓰지 않습니다.
 
 ---
 

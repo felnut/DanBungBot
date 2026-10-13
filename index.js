@@ -38,6 +38,8 @@ require("./Database");
 
 // 음악(Lavalink) 클라이언트 (Lavalink 서버가 꺼져 있어도 봇은 동작함)
 require("./bot/managers/musicManager").createMusicManager(client);
+require("./bot/managers/musicCache").startCacheServer(); // 곡 캐시 파일 서버 (Lavalink가 읽음)
+require("./bot/managers/ytdlp").warmup(); // yt-dlp 워커를 미리 띄워 첫 요청 지연 제거
 
 // ================== 커맨드 핸들러 초기화 ==================
 // 컬렉션을 생성해 봇이 메모리에 명령어를 기억

@@ -13,3 +13,6 @@ music/logs/
 music/application.yml
 music/run.log
 music/tools/
+
+music/cache/
+music/tools/
