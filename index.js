@@ -36,6 +36,9 @@ const NOTICE_CHANNEL_ID = process.env.NOTICE_CHANNEL_ID || "1476234963497259139"
 // DB 자동 연결 (초기화 및 마이그레이션 실행)
 require("./Database");
 
+// 음악(Lavalink) 클라이언트 (Lavalink 서버가 꺼져 있어도 봇은 동작함)
+require("./bot/managers/musicManager").createMusicManager(client);
+
 // ================== 커맨드 핸들러 초기화 ==================
 // 컬렉션을 생성해 봇이 메모리에 명령어를 기억
 client.commands = new Collection();
@@ -69,6 +72,19 @@ client.on(Events.InteractionCreate, async (interaction) => {
         await interaction.respond([]);
       } catch {
         /* 이미 응답했거나 만료됨 */
+      }
+    }
+    return;
+  }
+
+  // 음악 재생 패널 버튼
+  if (interaction.isButton() && interaction.customId.startsWith("music:")) {
+    try {
+      await require("./bot/managers/musicManager").handleMusicButton(interaction);
+    } catch (error) {
+      console.error(error);
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: "에러가 발생했습니다!", flags: [MessageFlags.Ephemeral] }).catch(() => {});
       }
     }
     return;

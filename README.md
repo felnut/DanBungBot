@@ -19,6 +19,7 @@
 - 🎲 **미니게임** : 홀짝 (2배), 복권 (꽝 없음), 조커 (저금 + 대박)
 - 📈 **주식 시스템** : 종목별 주가 변동, 매수/매도, 보유 자산 및 랭킹
 - 🔧 **관리자 명령어** : 봇 주인 전용 돈 강제 설정
+- 🎵 **음악 재생** : Lavalink + yt-dlp 기반 음성 채널 음악 (`/음악`, 재생 패널 버튼)
 - 🍽️ **학교 급식** : [NEIS Open API](https://open.neis.go.kr/) 기반 급식 조회
 - 🚫 **채팅 검열** : 욕설 자동 필터링 & 대체어 변환
 - 🧪 **테스트 모드** : `--test` 플래그로 `game-test.db` 분리 사용 가능
@@ -42,6 +43,7 @@
 - npm 또는 pnpm / yarn
 - Discord Bot 토큰 ([Discord Developer Portal](https://discord.com/developers/applications))
 - NEIS Open API 키 ([발급 페이지](https://open.neis.go.kr/portal/mainPage.do))
+- (음악 기능) Java 17 이상, [Lavalink v4](https://github.com/lavalink-devs/Lavalink/releases) `Lavalink.jar`, [yt-dlp](https://github.com/yt-dlp/yt-dlp)
 
 ---
 
@@ -114,6 +116,26 @@ OWNER_ID=테스터_ID
 ✅ 명령어 등록 성공!
 ✅ 준비 완료! 계정: BotName#1234
 ```
+
+---
+
+## 음악 기능 설정
+
+음악은 별도 프로세스인 **Lavalink**가 재생하고, 유튜브는 **yt-dlp**로 재생 주소를 뽑아 Lavalink에 넘깁니다.
+
+1. `Lavalink.jar`(v4)를 `music/`에 넣습니다.
+2. `music/application.yml.example`을 `music/application.yml`로 복사하고 `password`를 정합니다.
+3. `.env`에 같은 비밀번호를 적습니다.
+   ```
+   LAVALINK_HOST=127.0.0.1
+   LAVALINK_PORT=2333
+   LAVALINK_PASSWORD=application.yml의 password와 같은 값
+   YTDLP_PATH=yt-dlp (전체 경로 가능)
+   ```
+4. `music/start.bat`으로 Lavalink를 켠 뒤 `node index.js`로 봇을 켭니다.
+5. `/음악 재생 검색어:... [소스:사운드클라우드|유튜브]`로 재생합니다. 허용 링크는 유튜브·사운드클라우드·밴드캠프·트위치·비메오뿐입니다.
+
+유튜브가 막히면 `yt-dlp -U`로 업데이트하세요. Lavalink 유튜브 플러그인은 현재 봇 차단으로 쓰지 않습니다.
 
 ---
 

@@ -1,0 +1,40 @@
+server:
+  port: 2333
+  address: 127.0.0.1
+lavalink:
+  plugins:
+    # 유튜브 소스 플러그인 (버전은 https://github.com/lavalink-devs/youtube-source/releases 에서 최신 확인)
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.18.2"
+      snapshot: false
+  server:
+    password: "CHANGE_ME"   # .env의 LAVALINK_PASSWORD와 같아야 함
+    sources:
+      youtube: false        # 내장 유튜브 소스는 끄고 플러그인 사용
+      bandcamp: true
+      soundcloud: true
+      twitch: true
+      vimeo: true
+      http: true
+      local: false
+    bufferDurationMs: 400
+    resamplingQuality: HIGH    # 기본값 LOW. CPU를 조금 더 쓰지만 음질이 좋아짐
+    opusEncodingQuality: 10    # 최대(0~10)
+    frameBufferDurationMs: 5000
+    playerUpdateInterval: 5
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    clients: ["MUSIC", "TV", "TVHTML5EMBEDDED", "ANDROID_VR", "WEB", "WEBEMBEDDED"]
+    # 유튜브는 yt-dlp로 처리하므로 플러그인 OAuth는 사용하지 않음 (플러그인은 봇 차단으로 재생 불가)
+    oauth:
+      enabled: false
+      # refreshToken: "여기에 토큰"
+logging:
+  file:
+    path: ./logs/
+  level:
+    root: INFO
+    lavalink: INFO
