@@ -25,13 +25,8 @@ const {
   createStockUpdateEmbed,
   TICK_MINUTES,
   resetStocksOnce,
-  getPendingResetNotice,
-  clearPendingResetNotice,
-  createStockResetNoticeEmbed,
+  buildStockResetNoticeText,
 } = require("./bot/managers/stockManager");
-
-// 공지 채널 (.env의 NOTICE_CHANNEL_ID 우선, 없으면 봇 관련 채널)
-const NOTICE_CHANNEL_ID = process.env.NOTICE_CHANNEL_ID || "1476234963497259139";
 
 // DB 자동 연결 (초기화 및 마이그레이션 실행)
 require("./Database");
@@ -124,9 +119,6 @@ client.once(Events.ClientReady, (c) => {
   // 주식 업데이트 타이머 시작
   startScheduler();
 
-  // 주식 시장 초기화 공지 (전송에 성공할 때까지 매 시작마다 재시도)
-  sendPendingStockNotice();
-
   // 야구 게임 이벤트 연동
   const baseballGuessEvent = require("./bot/events/messageCreate/baseballGuess");
   baseballGuessEvent(client);
@@ -136,25 +128,10 @@ client.once(Events.ClientReady, (c) => {
     return new Date(Date.now() + 9 * 60 * 60 * 1000);
   }
 
-  // ================== 주식 초기화 공지 전송 ==================
-  async function sendPendingStockNotice() {
-    const notice = getPendingResetNotice();
-    if (!notice) return;
-    try {
-      const channel = await client.channels.fetch(NOTICE_CHANNEL_ID);
-      if (!channel?.isTextBased()) throw new Error("텍스트 채널이 아닙니다.");
-      await channel.send({ embeds: [createStockResetNoticeEmbed(notice)] });
-      clearPendingResetNotice();
-      console.log("📢 주식 초기화 공지 전송 완료");
-    } catch (err) {
-      console.error("주식 초기화 공지 전송 실패 (다음 시작 시 재시도):", err.message);
-    }
-  }
-
   // ================== 정시마다 동작하는 스케줄러 로직 ==================
   function startScheduler() {
     const tickMs = TICK_MINUTES * 60 * 1000;
-    let delayMs = tickMs - (Date.now() % tickMs); // 다음 경계(예: 10분 단위)까지 남은 시간
+    let delayMs = tickMs - (Date.now() % tickMs); // 다음 경계(예: 1시간 단위)까지 남은 시간
 
     // 경계 직후(30초 이내) 켜졌을 때 즉시 연속 실행되는 것을 방지하기 위해 한 틱 스킵
     if (delayMs < 30 * 1000) delayMs += tickMs;
@@ -215,12 +192,30 @@ async function start() {
     return; // 등록 후에는 봇 로그인하지 않음
   }
 
+  // "--list-admins": 등록된 서버 관리자 연락처 목록 출력 (운영자 전용, 이메일은 이 명령으로만 열람)
+  if (process.argv.includes("--list-admins")) {
+    const rows = require("./Database")
+      .prepare("SELECT guild_id, user_id, email, consented_at FROM admin_contact ORDER BY guild_id, user_id")
+      .all();
+    if (rows.length === 0) console.log("등록된 관리자가 없습니다.");
+    for (const r of rows) {
+      console.log(`${r.guild_id}	${r.user_id}	${r.email}	${new Date(r.consented_at).toISOString()}`);
+    }
+    console.log(`
+총 ${rows.length}건 (서버ID / 사용자ID / 이메일 / 동의 시각)`);
+    return;
+  }
+
   // "--reset-stocks": 주식 시장 1회성 초기화 (백업 → 주가 기준가 복원 → 보유 주식 50% 현금 보상)
   if (process.argv.includes("--reset-stocks")) {
     const report = resetStocksOnce();
     if (report) {
       console.log(
         `✅ 주식 초기화 완료: ${report.users}명, 총 ${report.totalPaid.toLocaleString()}원 보상 (백업: ${report.backupPath})`,
+      );
+      // 공지는 자동 전송하지 않는다 — 아래 안내문을 운영자가 직접 전달
+      console.log(
+        `\n----- 안내문 (직접 전달용) -----\n${buildStockResetNoticeText(report)}\n--------------------------------`,
       );
     } else {
       console.log("ℹ️ 주식 초기화는 이미 실행되었습니다. 건너뜁니다.");

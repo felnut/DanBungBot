@@ -163,6 +163,7 @@ if (!hasIdColumn) {
 }
 
 // 나머지 컬럼들 안전하게 추가
+ensureColumn("stocks", "latent_price REAL DEFAULT 0"); // 장 마감 중에도 계산되는 숨은 주가 (개장 시 갭으로 반영)
 ensureColumn("stocks", "last_price REAL DEFAULT 0");
 ensureColumn("stocks", "last_change REAL DEFAULT 0");
 ensureColumn("stocks", "cooldown_until INTEGER DEFAULT 0");
@@ -185,7 +186,19 @@ db.exec(`
 db.prepare("INSERT OR IGNORE INTO market_state (id, vol_mult, last_day) VALUES (1, 1, NULL)").run();
 // 주식 시장 1회성 초기화(개편) 완료 여부와, 아직 전송하지 못한 공지(JSON)
 ensureColumn("market_state", "stock_reset_done INTEGER DEFAULT 0");
-ensureColumn("market_state", "reset_notice TEXT DEFAULT NULL");
+ensureColumn("market_state", "reset_notice TEXT DEFAULT NULL"); // 더 이상 사용하지 않음(자동 공지 제거)
+
+// 서버 관리자 연락처 (운영 공지를 운영자가 수동으로 보낼 때만 사용) — 서버·사용자별 1건
+db.exec(`
+  CREATE TABLE IF NOT EXISTS admin_contact (
+    guild_id TEXT NOT NULL,
+    user_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    consented_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    PRIMARY KEY (guild_id, user_id)
+  )
+`);
 
 console.log("ℹ️ 마이그레이션 완료");
 
