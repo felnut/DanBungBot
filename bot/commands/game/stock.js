@@ -15,7 +15,7 @@ const cache = require("../utils/cache");
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("주식")
-    .setDescription("서버 주식 거래소 (10분마다 시세 갱신)")
+    .setDescription("서버 주식 거래소 (1시간 마다 시세 변동)")
     .addSubcommand((sub) =>
       sub.setName("주가").setDescription("현재 주가 확인"),
     )
@@ -70,13 +70,13 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply();
+    // DB 조회만 하므로 "생각 중…" 없이 계산 후 바로 응답한다 (각 분기에서 interaction.reply)
     const sub = interaction.options.getSubcommand();
 
     // ====================== 주가 확인 ======================
     if (sub === "주가") {
       const embed = createStockUpdateEmbed();
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.reply({ embeds: [embed] });
     }
 
     // ====================== 매수 / 매도 ======================
@@ -97,18 +97,18 @@ module.exports = {
           interaction.user.username,
         );
 
-        return interaction.editReply({
+        return interaction.reply({
           content: `✅ **${STOCKS[symbol].name} ${sub} 완료!**`,
           embeds: [portfolioEmbed],
         });
       } catch (e) {
-        return interaction.editReply(`❌ ${e.message}`);
+        return interaction.reply(`❌ ${e.message}`);
       }
     }
     // ====================== 내 주식 ======================
     if (sub === "내주식") {
       const embed = createMyStocksEmbed(interaction.user.id, interaction.user.username);
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.reply({ embeds: [embed] });
     }
     // ====================== 내 주식 ======================
     if (sub === "랭킹") {
@@ -163,24 +163,24 @@ module.exports = {
         });
       }
 
-      return interaction.editReply({ embeds: [embed] });
+      return interaction.reply({ embeds: [embed] });
     }
 
     // ====================== 주가 강제 업데이트 (관리자 전용) ======================
     if (sub === "업데이트") {
       if (!interaction.member.permissions.has("ADMINISTRATOR")) {
-        return interaction.editReply("❌ 관리자만 쓸 수 있습니다.");
+        return interaction.reply("❌ 관리자만 쓸 수 있습니다.");
       }
       try {
         await updateStockPrices({ force: true });
         cache.del("leaderboard:stock_value:top10");
         const updateEmbed = createStockUpdateEmbed();
-        return interaction.editReply({
+        return interaction.reply({
           content: "✅ 주가 업데이트 완료!",
           embeds: [updateEmbed],
         });
       } catch (e) {
-        return interaction.editReply(`❌ 업데이트 중 오류: ${e.message}`);
+        return interaction.reply(`❌ 업데이트 중 오류: ${e.message}`);
       }
     }
   },

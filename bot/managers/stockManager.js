@@ -46,8 +46,7 @@ const stmtSelectRecentNews = db.prepare(`
       SELECT name, last_news_title, last_news_time 
       FROM stocks 
       WHERE last_news_title IS NOT NULL 
-      ORDER BY last_news_time DESC 
-      LIMIT 1
+      ORDER BY last_news_time DESC
     `);
 const stmtSelectHoldingsForUser = db.prepare(`
       SELECT us.*, s.name, s.price, s.last_change
@@ -345,44 +344,58 @@ const STOCKS = {
  * (주기적으로 호출됨 - 보통 setInterval로)
  */
 // ── 주가 모델: 실제 증시처럼 동작 ──
-// • 정규장: 평일 09:00~15:30(KST)에만 시세가 움직인다. 그 외(장 마감·주말)에는 마지막 종가가 유지되고,
-//   거래는 항상 가능(시간외 종가 거래).
+// • 정규장: 평일 06:00~23:00(KST, 밤 11시~아침 6시는 장 마감). 거래도 장중에만 가능하다(장 마감·주말·국경일 중지).
+// • 주가 계산은 장 마감 중에도 1시간마다 계속된다. 마감 중에는 화면에 보이는 가격(price)은 멈춰 있고
+//   숨은 주가(latent_price)만 움직이다가, 개장 첫 틱에서 보이는 가격이 숨은 주가로 한 번에 바뀐다(갭 상승/하락).
 // • 시장 공통 요인(시장 전체의 움직임)에 종목별 베타를 곱한 값 + 종목 고유 움직임(+뉴스)으로 구성된다.
 // • 변동성 국면(평온/보통/불안)이 가끔 바뀌어 변동성이 한동안 지속된다(변동성 군집).
 // • 전일 종가 대비 ±30% 가격 제한폭(상한가/하한가), 매 거래일 시가·고가·저가·종가 기록.
 // • 모든 움직임의 상승 확률은 49.5% : 하락 50.5% → 큰 수의 법칙으로 장기 보유할수록 소폭 손해(하우스 엣지 1%).
-const TICK_MINUTES = 10;
+const TICK_MINUTES = 60; // 1시간마다 주가 계산 (장 마감 중에도 계속, 하루 24번)
 const UP_PROB = 0.495;
-const BASE_STEP = 0.0028; // 종목 고유 틱 변동폭 (vol 곱함)
-const MARKET_STEP = 0.002; // 시장 공통 틱 변동폭 (beta 곱함)
-const NEWS_PROB = 0.02; // 틱당 뉴스 발생 확률
+const BASE_STEP = 0.0035; // 종목 고유 틱 변동폭 (vol 곱함). 하루 24틱 기준으로 하루 변동성이 이전(10분 틱 39회)과 비슷하도록 조정
+const MARKET_STEP = 0.0025; // 시장 공통 틱 변동폭 (beta 곱함). 위와 같은 이유
+const NEWS_PROB = 0.033; // 틱당 종목별 뉴스 발생 확률 (하루 종목당 약 0.8건). 장 마감 중에도 같은 확률로 나온다
 const NEWS_STEP = 0.02; // 뉴스 틱 고유 변동폭
 const DAILY_LIMIT = 0.3; // 가격 제한폭 (전일 종가 대비)
-const MARKET_OPEN_MIN = 9 * 60; // 09:00
-const MARKET_CLOSE_MIN = 15 * 60 + 30; // 15:30
+const MARKET_OPEN_MIN = 6 * 60; // 06:00
+const MARKET_CLOSE_MIN = 23 * 60; // 23:00
 const REGIMES = [
   { mult: 0.7, label: "😌 평온" },
   { mult: 1.0, label: "🙂 보통" },
   { mult: 1.0, label: "🙂 보통" },
   { mult: 1.6, label: "😰 불안" },
 ];
-const REGIME_SWITCH_PROB = 0.02; // 틱당 국면 전환 확률
+const REGIME_SWITCH_PROB = 0.033; // 틱당 국면 전환 확률 (하루 남짓 지속)
 
 // market_state 테이블과 stocks.day_open/day_high/day_low 컬럼은 Database.js 마이그레이션에서 생성된다.
 const stmtMarketState = db.prepare("SELECT vol_mult, last_day FROM market_state WHERE id = 1");
 const stmtSetVol = db.prepare("UPDATE market_state SET vol_mult = ? WHERE id = 1");
 const stmtSetDay = db.prepare("UPDATE market_state SET last_day = ? WHERE id = 1");
 const stmtAllForTick = db.prepare(
-  "SELECT symbol, price, last_price, day_open, day_high, day_low, history FROM stocks",
+  "SELECT symbol, price, latent_price, last_price, day_open, day_high, day_low, history FROM stocks",
 );
 const stmtRollover = db.prepare(
   "UPDATE stocks SET last_price = price, day_open = price, day_high = price, day_low = price, history = ? WHERE symbol = ?",
 );
+// 장중 틱: 보이는 가격과 숨은 주가를 같이 갱신
 const stmtTickNoNews = db.prepare(
-  "UPDATE stocks SET price = ?, last_change = ?, day_high = ?, day_low = ? WHERE symbol = ?",
+  "UPDATE stocks SET price = ?, latent_price = ?, last_change = ?, day_high = ?, day_low = ? WHERE symbol = ?",
 );
 const stmtTickWithNews = db.prepare(
-  "UPDATE stocks SET price = ?, last_change = ?, day_high = ?, day_low = ?, last_news_title = ?, last_news_time = ? WHERE symbol = ?",
+  "UPDATE stocks SET price = ?, latent_price = ?, last_change = ?, day_high = ?, day_low = ?, last_news_title = ?, last_news_time = ? WHERE symbol = ?",
+);
+// 그날 첫 장중 틱(개장): 갭이 반영된 가격이 시가가 된다
+const stmtOpenNoNews = db.prepare(
+  "UPDATE stocks SET price = ?, latent_price = ?, last_change = ?, day_open = ?, day_high = ?, day_low = ? WHERE symbol = ?",
+);
+const stmtOpenWithNews = db.prepare(
+  "UPDATE stocks SET price = ?, latent_price = ?, last_change = ?, day_open = ?, day_high = ?, day_low = ?, last_news_title = ?, last_news_time = ? WHERE symbol = ?",
+);
+// 장 마감 중 틱: 숨은 주가만 갱신 (화면의 가격은 그대로)
+const stmtLatentNoNews = db.prepare("UPDATE stocks SET latent_price = ? WHERE symbol = ?");
+const stmtLatentWithNews = db.prepare(
+  "UPDATE stocks SET latent_price = ?, last_news_title = ?, last_news_time = ? WHERE symbol = ?",
 );
 
 /** 한국 표준시(KST) 시각 정보 (UTC getter로 읽는다) */
@@ -409,7 +422,7 @@ function getHolidayName(date = new Date()) {
   return NATIONAL_HOLIDAYS[getKST(date).dayStr.slice(5)] || null;
 }
 
-/** 정규장 여부 (평일 09:00~15:30, 국경일 제외) */
+/** 정규장 여부 (평일 06:00~23:00, 국경일 제외) */
 function isMarketOpen(date = new Date()) {
   const { weekday, minutes } = getKST(date);
   return (
@@ -431,10 +444,10 @@ function getMarketStatus() {
   const open = isMarketOpen();
   const holiday = getHolidayName();
   const label = open
-    ? "🟢 장중 (09:00~15:30)"
+    ? "🟢 **장중** · 1시간 마다 시세 변동"
     : holiday
-      ? `🔴 휴장 (${holiday}) · 시간외 종가 거래`
-      : "🔴 장 마감 (시간외 종가 거래)";
+      ? `🔴 **휴장** (${holiday}) · 시세 정지, 거래 중지 · 개장 시 갭 상승·하락 반영`
+      : "🔴 **장 마감** · 시세 정지·거래 중지 (매일 밤 11시~아침 6시, 주말·국경일 종일) · 개장 시 갭 상승·하락 반영";
   return { open, label };
 }
 
@@ -454,22 +467,28 @@ if (!stmtMarketState.get().last_day) {
 }
 
 /**
- * 주가 한 틱 갱신 (TICK_MINUTES분마다 호출). 장이 닫혀 있으면 아무것도 하지 않는다.
- * @param {{force?: boolean}} [opts] force=true면 장 시간과 무관하게 한 틱 진행(관리자 테스트용)
- * @returns {boolean} 갱신 여부
+ * 주가 한 틱 계산 (TICK_MINUTES분마다 호출).
+ * 장중에는 보이는 가격을 갱신하고, 장 마감 중에는 숨은 주가(latent_price)만 갱신한다.
+ * 개장 첫 틱에서는 보이는 가격이 숨은 주가를 따라가므로 마감 동안의 변동이 갭 상승/하락으로 한 번에 반영된다.
+ * @param {{force?: boolean}} [opts] force=true면 장 시간과 무관하게 장중 틱으로 진행(관리자 테스트용)
+ * @returns {boolean} 항상 true
  */
 async function updateStockPrices({ force = false } = {}) {
-  // 타이머가 경계 시각보다 몇 ms 일찍 깨어나도 09:00 틱을 놓치지 않도록 5초 여유를 둔다
-  // (15:30 경계 틱은 15:29:55+5초 = 15:30:00으로 계산되어 마감 처리)
+  // 타이머가 경계 시각보다 몇 ms 일찍 깨어나도 06:00 틱을 놓치지 않도록 5초 여유를 둔다
+  // (23:00 경계 틱은 22:59:55+5초 = 23:00:00으로 계산되어 마감 처리)
   const at = new Date(Date.now() + 5000);
-  if (!force && !isMarketOpen(at)) return false;
+  const open = force || isMarketOpen(at);
 
   const nowSec = Math.floor(Date.now() / 1000);
   const { dayStr } = getKST(at);
 
   const tx = db.transaction(() => {
-    // 새 거래일이면 일봉 롤오버
-    if (stmtMarketState.get().last_day !== dayStr) rolloverDay(dayStr);
+    // 새 거래일의 첫 장중 틱이면 일봉 롤오버 (전일 종가 = 마감 때 보이던 가격)
+    let newDay = false;
+    if (open && stmtMarketState.get().last_day !== dayStr) {
+      rolloverDay(dayStr);
+      newDay = true;
+    }
 
     // 변동성 국면 전환
     if (Math.random() < REGIME_SWITCH_PROB) {
@@ -495,23 +514,36 @@ async function updateStockPrices({ force = false } = {}) {
         : BASE_STEP * info.vol * regime * (0.5 + Math.random());
       const change = (info.beta ?? 1) * marketRet + (up ? idioStep : -idioStep);
 
-      // 전일 종가 대비 가격 제한폭 적용
-      const prevClose = stock.last_price || stock.price;
+      // 숨은 주가에서 출발 (장 마감 중에 쌓인 변동 포함). 없으면(구버전 DB) 현재 가격에서 시작
+      const base = stock.latent_price > 0 ? stock.latent_price : stock.price;
+      // 전일 종가 대비 가격 제한폭 적용 (마감 중에는 마감 때 보이는 가격이 기준)
+      const prevClose = open ? stock.last_price || stock.price : stock.price;
       const lower = Math.max(Math.round(prevClose * (1 - DAILY_LIMIT)), 1);
       const upper = Math.round(prevClose * (1 + DAILY_LIMIT));
-      const newPrice = Math.min(
-        Math.max(Math.round(stock.price * (1 + change)), lower),
-        upper,
-      );
+      const newPrice = Math.min(Math.max(Math.round(base * (1 + change)), lower), upper);
 
-      const high = Math.max(stock.day_high || stock.price, newPrice);
-      const low = Math.min(stock.day_low || stock.price, newPrice);
+      if (!open) {
+        // 장 마감 중: 화면의 가격은 그대로, 숨은 주가와 뉴스만 갱신
+        if (news) stmtLatentWithNews.run(newPrice, news.title, nowSec, stock.symbol);
+        else stmtLatentNoNews.run(newPrice, stock.symbol);
+        continue;
+      }
+
+      // 장중: 보이는 가격 = 숨은 주가. 첫 틱이면 마감 동안의 변동이 갭으로 한 번에 반영된다
+      const high = newDay ? newPrice : Math.max(stock.day_high || stock.price, newPrice);
+      const low = newDay ? newPrice : Math.min(stock.day_low || stock.price, newPrice);
       const realized = stock.price > 0 ? newPrice / stock.price - 1 : 0;
 
-      if (news) {
-        stmtTickWithNews.run(newPrice, realized, high, low, news.title, nowSec, stock.symbol);
+      if (newDay) {
+        if (news) {
+          stmtOpenWithNews.run(newPrice, newPrice, realized, newPrice, high, low, news.title, nowSec, stock.symbol);
+        } else {
+          stmtOpenNoNews.run(newPrice, newPrice, realized, newPrice, high, low, stock.symbol);
+        }
+      } else if (news) {
+        stmtTickWithNews.run(newPrice, newPrice, realized, high, low, news.title, nowSec, stock.symbol);
       } else {
-        stmtTickNoNews.run(newPrice, realized, high, low, stock.symbol);
+        stmtTickNoNews.run(newPrice, newPrice, realized, high, low, stock.symbol);
       }
     }
   });
@@ -570,18 +602,16 @@ function resetStocksOnce() {
     db.prepare("DELETE FROM user_stocks").run();
     for (const [symbol, info] of Object.entries(STOCKS)) {
       db.prepare(
-        `UPDATE stocks SET price = ?, last_price = ?, day_open = ?, day_high = ?, day_low = ?,
+        `UPDATE stocks SET price = ?, latent_price = ?, last_price = ?, day_open = ?, day_high = ?, day_low = ?,
            history = '', last_change = 0, last_news_title = NULL, last_news_time = 0 WHERE symbol = ?`,
-      ).run(info.base, info.base, info.base, info.base, info.base, symbol);
+      ).run(info.base, info.base, info.base, info.base, info.base, info.base, symbol);
     }
     stmtSetVol.run(1);
     stmtSetDay.run(null);
     rolloverDay(getKST().dayStr);
 
     report = { users: valueByUser.size, totalPaid, totalValue, backupPath };
-    db.prepare(
-      "UPDATE market_state SET stock_reset_done = 1, reset_notice = ? WHERE id = 1",
-    ).run(JSON.stringify({ users: report.users, totalPaid, totalValue }));
+    db.prepare("UPDATE market_state SET stock_reset_done = 1 WHERE id = 1").run();
   })();
 
   cache.del("stocks:snapshotRows");
@@ -591,56 +621,32 @@ function resetStocksOnce() {
   return report;
 }
 
-/** 아직 전송하지 못한 초기화 공지(없으면 null) */
-function getPendingResetNotice() {
-  const row = db.prepare("SELECT reset_notice FROM market_state WHERE id = 1").get();
-  return row?.reset_notice ? JSON.parse(row.reset_notice) : null;
-}
-
-function clearPendingResetNotice() {
-  db.prepare("UPDATE market_state SET reset_notice = NULL WHERE id = 1").run();
-}
-
-/** 초기화 공지 임베드 */
-function createStockResetNoticeEmbed(notice) {
+/** 초기화 안내문 (자동 전송하지 않음 — 운영자가 콘솔에서 복사해 직접 안내) */
+function buildStockResetNoticeText(report) {
   const priceLines = Object.values(STOCKS)
-    .map((s) => `• ${s.name} ${s.base.toLocaleString()}원`)
+    .map((s) => `- ${s.name} ${s.base.toLocaleString()}원`)
     .join("\n");
-  return new EmbedBuilder()
-    .setColor(0xf1c40f)
-    .setTitle("📢 주식 시장 개편 및 초기화 안내")
-    .setDescription(
-      "주식 시장이 **실제 증시와 비슷한 방식**으로 전면 개편되었습니다.\n" +
-        "이에 따라 모든 종목 주가를 초기화하고, 기존 보유 주식은 아래와 같이 정리했습니다.",
-    )
-    .addFields(
-      {
-        name: "🔄 초기화 내용",
-        value:
-          "• 모든 종목 주가가 기준가로 초기화되었습니다.\n" +
-          "• 기존 보유 주식은 모두 정리(삭제)되었습니다.",
-        inline: false,
-      },
-      {
-        name: "💰 보상",
-        value:
-          `• 보유하고 있던 주식 평가액(수량 × 초기화 직전 주가)의 **${RESET_COMPENSATION_RATE * 100}%**를 현금으로 지급했습니다.\n` +
-          `• 대상 ${notice.users.toLocaleString()}명 · 총 ${notice.totalPaid.toLocaleString()}원\n` +
-          "• 보유한 주식이 없던 분은 해당 없습니다. 잔액은 `/돈`으로 확인하세요.",
-        inline: false,
-      },
-      { name: "📈 새 기준가", value: priceLines, inline: false },
-      {
-        name: "🕘 달라진 점",
-        value:
-          "• 장 시간: 평일 09:00~15:30 (10분마다 시세 갱신), 그 외에는 종가로 거래\n" +
-          "• 국경일(삼일절·제헌절·광복절·개천절·한글날)은 휴장\n" +
-          "• 시장 분위기·종목별 민감도(베타)·전일 대비 ±30% 가격 제한폭·단붕 지수 도입",
-        inline: false,
-      },
-    )
-    .setFooter({ text: "/주식 주가 로 시황 확인 · /주식 내주식 으로 자산 확인" })
-    .setTimestamp();
+  return [
+    "[주식 시장 개편 및 초기화 안내]",
+    "주식 시장이 실제 증시와 비슷한 방식으로 전면 개편되었습니다.",
+    "",
+    "초기화 내용",
+    "- 모든 종목 주가가 기준가로 초기화되었습니다.",
+    "- 기존 보유 주식은 모두 정리(삭제)되었습니다.",
+    "",
+    "보상",
+    `- 보유 주식 평가액(수량 × 초기화 직전 주가)의 ${RESET_COMPENSATION_RATE * 100}%를 현금으로 지급했습니다.`,
+    `- 대상 ${report.users.toLocaleString()}명 · 총 ${report.totalPaid.toLocaleString()}원`,
+    "- 보유한 주식이 없던 분은 해당 없습니다. 잔액은 /돈 으로 확인하세요.",
+    "",
+    "새 기준가",
+    priceLines,
+    "",
+    "달라진 점",
+    "- 장 시간: 평일 06:00~23:00 (1시간마다 시세 갱신), 밤 11시~아침 6시와 주말·국경일에는 거래 중지",
+    "- 국경일(삼일절·제헌절·광복절·개천절·한글날) 휴장",
+    "- 시장 분위기·종목별 민감도(베타)·전일 대비 ±30% 가격 제한폭·단붕 지수 도입",
+  ].join("\n");
 }
 
 /**
@@ -658,7 +664,10 @@ function getRandomNews(symbol, up) {
 // 매수 / 매도 함수들 (buyStock, sellStock)
 // ────────────────────────────────────────────────
 
+const MARKET_CLOSED_MSG = "장 마감 중에는 거래 불가 (거래 가능: 평일 06:00~23:00, 국경일 제외)";
+
 function buyStock(userId, symbol, quantity) {
+  if (!isMarketOpen()) throw new Error(MARKET_CLOSED_MSG);
   const tx = db.transaction(() => {
     const stock = stmtSelectStockPrice.get(symbol);
     if (!stock) throw new Error("존재하지 않는 종목입니다.");
@@ -694,6 +703,7 @@ function buyStock(userId, symbol, quantity) {
 }
 
 function sellStock(userId, symbol, quantity) {
+  if (!isMarketOpen()) throw new Error(MARKET_CLOSED_MSG);
   const tx = db.transaction(() => {
     const holding = stmtSelectHoldingShares.get(userId, symbol);
     if (!holding || holding.shares < quantity)
@@ -774,62 +784,59 @@ function createStockUpdateEmbed() {
     .setColor(0x00aa99)
     .setTitle("📈 주식 시장 시황")
     .setDescription(
-      `**${status.label}** · 시장 분위기 ${regime.label}\n` +
-        `📊 **단붕 지수 ${idx.toFixed(1)}** (${fmtPct(idxRate)})`,
+      `${status.label}\n\n` +
+        `시장 분위기: ${regime.label}\n` +
+        `📊 **단붕 지수 ${idx.toFixed(1)}** (${fmtPct(idxRate)})\n` +
+        "-# 단붕 지수 = 7개 종목 주가를 시작 가격과 비교한 평균 (시작 = 1000)",
     );
 
   stocks.forEach((s) => {
     const name = s.name || STOCKS[s.symbol]?.name || s.symbol;
     const prev = s.last_price || s.price;
     const rate = prev > 0 ? s.price / prev - 1 : 0;
+    const icon = rate > 0 ? "🔺" : rate < 0 ? "🔻" : "▫️";
     const limit = s.price >= Math.round(prev * (1 + DAILY_LIMIT)) ? " 🚫상한가" : s.price <= Math.max(Math.round(prev * (1 - DAILY_LIMIT)), 1) ? " 🚫하한가" : "";
     const hist = (s.history ? s.history.split(",").filter(Boolean).map(Number) : []).slice(-9);
-    const chart = sparkline([...hist, s.price]);
-    const range =
-      s.day_high && s.day_low
-        ? `고 ${s.day_high.toLocaleString()} · 저 ${s.day_low.toLocaleString()}`
-        : "";
+    // 종가 기록이 충분히 쌓였을 때만 미니 차트를 보여 준다 (점이 2~3개면 오히려 헷갈림)
+    const chart = hist.length >= 4 ? sparkline([...hist, s.price]) : "";
+    const lines = [`**${s.price.toLocaleString()}원**  ${fmtPct(rate)}${limit}`];
+    if (s.day_high && s.day_low) {
+      lines.push(`오늘 최고 ${s.day_high.toLocaleString()}원 · 최저 ${s.day_low.toLocaleString()}원`);
+    }
+    if (chart) lines.push(`최근 종가 흐름 \`${chart}\``);
 
     embed.addFields({
-      name: `${name} (${s.symbol.toUpperCase()})`,
-      value:
-        `**${s.price.toLocaleString()}원** ${fmtPct(rate)}${limit}\n` +
-        (chart ? `\`${chart}\` ` : "") +
-        range,
+      name: `${icon} ${name} (${s.symbol.toUpperCase()})`,
+      value: lines.join("\n"),
       inline: false,
     });
   });
 
   // 최근 뉴스
+  // 뉴스가 있는 모든 종목의 가장 최근 뉴스 (종목당 1건, 최신순)
   let recentNews = cache.get("stocks:recentNews");
   if (!recentNews) {
-    recentNews = stmtSelectRecentNews.get();
-    cache.set("stocks:recentNews", recentNews || null, 30000);
+    recentNews = stmtSelectRecentNews.all();
+    cache.set("stocks:recentNews", recentNews, 30000);
   }
 
-  if (recentNews?.last_news_title) {
-    const time = new Date(recentNews.last_news_time * 1000);
-    const timeStr = time.toLocaleTimeString("ko-KR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-      timeZone: "Asia/Seoul",
-    });
-    embed.addFields({
-      name: `📰 [${recentNews.name}] 최근 주요 뉴스`,
-      value: `${recentNews.last_news_title}\n${timeStr}`,
-      inline: false,
-    });
-  } else {
-    embed.addFields({
-      name: "📰 최근 주요 뉴스",
-      value: "최근 뉴스가 없습니다.",
-      inline: false,
-    });
+  // 디스코드 필드 길이 제한(1024자) 안에서 줄 단위로 최대한 많이 보여 준다
+  const newsLines = [];
+  let newsLen = 0;
+  for (const n of recentNews) {
+    const line = `[${n.name}] ${n.last_news_title}`;
+    if (newsLen + line.length + 1 > 1024) break;
+    newsLines.push(line);
+    newsLen += line.length + 1;
   }
+  embed.addFields({
+    name: "📰 최근 주요 뉴스",
+    value: newsLines.length ? newsLines.join("\n") : "최근 뉴스 없음",
+    inline: false,
+  });
 
   embed.setFooter({
-    text: "전일 종가 대비 · 10분마다 갱신(장중) · 가격 제한폭 ±30% · 국경일 휴장",
+    text: "등락률 전일 종가 기준 · 하루 최대 ±30% 변동 · 국경일 휴장",
   });
   embed.setTimestamp();
 
@@ -932,9 +939,7 @@ function getStocksForAutocomplete() {
 module.exports = {
   TICK_MINUTES,
   resetStocksOnce,
-  getPendingResetNotice,
-  clearPendingResetNotice,
-  createStockResetNoticeEmbed,
+  buildStockResetNoticeText,
   getHolidayName,
   isMarketOpen,
   getMarketStatus,
