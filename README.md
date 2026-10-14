@@ -3,12 +3,12 @@
 [![Node.js](https://img.shields.io/badge/Node.js-v18+-378e3d?logo=nodedotjs&logoColor=white)](https://nodejs.org/)
 [![discord.js](https://img.shields.io/badge/discord.js-v14-5865F2?logo=discord&logoColor=white)](https://discord.js.org/)
 [![SQLite](https://img.shields.io/badge/SQLite-Database-003B57?logo=sqlite&logoColor=white)](https://www.sqlite.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-blue.svg)](https://polyformproject.org/licenses/noncommercial/1.0.0)
 
 단국대학교부속소프트웨어고등학교 Discord 서버를 위한 게임 & 유틸리티 봇입니다.  
 로컬 SQLite 데이터베이스를 활용해 사용자 돈, 출석, 저금 등을 관리합니다.
 
-데일리 출석, 홀짝·복권·조커 같은 미니게임,  
+데일리 출석, 홀짝·복권·카드뽑기 같은 미니게임,  
 송금·랭킹 시스템, 학교 급식 조회, 욕설 검열 기능까지 포함되어 있습니다.
 
 ---
@@ -16,7 +16,7 @@
 ## 기능 한눈에 보기
 
 - 💰 **경제 시스템** : 개인 돈 관리, 데일리 출석 보상, 송금, 서버 랭킹
-- 🎲 **미니게임** : 홀짝 (2배), 복권 (꽝 없음), 조커 (저금 + 대박)
+- 🎲 **미니게임** : 홀짝 (2배), 복권 (꽝 없음), 카드뽑기 (카드별 배당, 조커 대박)
 - 📈 **주식 시스템** : 종목별 주가 변동, 매수/매도, 보유 자산 및 랭킹
 - 🔧 **관리자 명령어** : 봇 주인 전용 돈 강제 설정
 - 🎵 **음악 재생** : Lavalink + yt-dlp 기반 음성 채널 음악 (`/음악`, 재생 패널 버튼)
@@ -245,6 +245,6 @@ Pull Request도 언제든 환영합니다.
 
 ## 라이선스
 
-본 프로젝트는 [MIT License](https://opensource.org/licenses/MIT)를 따릅니다.
+본 프로젝트는 [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)을 따릅니다. 개인·학습·비영리 목적의 이용은 허용하며, **상업적 이용은 허용하지 않습니다.** (2026-10-15 이전에 MIT 라이선스로 받은 사본에는 당시의 MIT 라이선스가 계속 적용됩니다.)
 
-Copyright © 2026 ZYNTAX6760
+Copyright © 2026 felnut

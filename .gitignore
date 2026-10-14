@@ -16,3 +16,7 @@ music/tools/
 
 music/cache/
 music/tools/
+
+# 실행 로그
+bot-run.log
+music/run.err.log
