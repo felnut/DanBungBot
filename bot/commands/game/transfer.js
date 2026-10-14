@@ -28,21 +28,20 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const target = interaction.options.getUser("유저");
     const amount = interaction.options.getInteger("금액");
 
     // 자기 자신에게 송금 금지
     if (target.id === interaction.user.id) {
-      return interaction.editReply({
+      return interaction.reply({
         content: "자기 자신한테는 못 보내요 ㅠㅠ",
         flags: 64,
       });
     }
     // 봇에게 송금 금지
     if (target.bot) {
-      return interaction.editReply({
+      return interaction.reply({
         content: "봇한테는 돈 못 보내요!",
         flags: 64,
       });
@@ -56,13 +55,13 @@ module.exports = {
         err.message === "NOT_REGISTERED"
           ? "먼저 `/돈`으로 가입해주세요!"
           : `💸 돈이 부족해요! (필요: ${amount.toLocaleString()}원)`;
-      return interaction.editReply({ content, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content, flags: MessageFlags.Ephemeral });
     }
 
     // 받는 사람이 가입되어 있는지 확인
     const receiver = stmtSelectReceiver.get(target.id);
     if (!receiver) {
-      return interaction.editReply({
+      return interaction.reply({
         content: `${target} 님은 아직 가입 안 했어요.\n상대방이 먼저 \`/돈\` 쳐야 송금 가능해요!`,
         flags: 64,
       });
@@ -104,6 +103,6 @@ module.exports = {
       )
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

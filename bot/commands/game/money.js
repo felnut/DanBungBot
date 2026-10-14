@@ -12,7 +12,6 @@ module.exports = {
     .setDescription("현재 보유 금액을 확인합니다 💰"),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     // 유저 정보 불러오기
     let user = db
@@ -41,6 +40,6 @@ module.exports = {
       .setThumbnail(interaction.user.displayAvatarURL({ dynamic: true }))
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

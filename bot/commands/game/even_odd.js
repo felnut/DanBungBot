@@ -32,7 +32,6 @@ module.exports = {
     ),
 
   async execute(interaction) {
-    await interaction.deferReply();
 
     const choice = interaction.options.getString("선택"); // 사용자가 선택한 홀/짝
     const bet = interaction.options.getInteger("금액"); // 베팅 금액
@@ -45,7 +44,7 @@ module.exports = {
         err.message === "NOT_REGISTERED"
           ? "먼저 `/돈`으로 가입해주세요!"
           : `💸 돈이 부족해요! (필요: ${bet.toLocaleString()}원)`;
-      return interaction.editReply({ content, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content, flags: MessageFlags.Ephemeral });
     }
 
     // 결과 생성 및 승패 판단
@@ -83,6 +82,6 @@ module.exports = {
       )
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed] });
   },
 };

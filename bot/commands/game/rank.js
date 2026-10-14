@@ -8,7 +8,6 @@ module.exports = {
     .setDescription("서버에서 제일 돈 많은 사람들 TOP 10 💰"),
 
   async execute(interaction) {
-    await interaction.deferReply();
 
     // 서버 전체 돈 순위 TOP 10 조회
     const rankings = await cache.getOrSet(
@@ -21,7 +20,7 @@ module.exports = {
     );
 
     if (rankings.length === 0) {
-      return interaction.editReply("아직 아무도 돈을 안 벌었네... 출석부터 해보세요! 🔥");
+      return interaction.reply("아직 아무도 돈을 안 벌었네... 출석부터 해보세요! 🔥");
     }
 
     const medals = ["🥇", "🥈", "🥉"];
@@ -71,6 +70,6 @@ module.exports = {
       });
     }
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed] });
   },
 };

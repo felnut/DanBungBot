@@ -34,7 +34,6 @@ module.exports = {
     .setDescription("500원으로 복권을 구매합니다. (200~50,000원 당첨)"),
 
   async execute(interaction) {
-    await interaction.deferReply();
 
     const useFee = 500; // 복권 가격
 
@@ -46,7 +45,7 @@ module.exports = {
         err.message === "NOT_REGISTERED"
           ? "먼저 `/돈`으로 가입해주세요!"
           : `💸 돈이 부족해요! (500원 필요)`;
-      return interaction.editReply({ content, flags: MessageFlags.Ephemeral });
+      return interaction.reply({ content, flags: MessageFlags.Ephemeral });
     }
 
     // 500원 차감
@@ -92,7 +91,7 @@ module.exports = {
         .setStyle(ButtonStyle.Primary),
     );
 
-    await interaction.editReply({ embeds: [buyEmbed], components: [row] });
+    await interaction.reply({ embeds: [buyEmbed], components: [row] });
 
     const message = await interaction.fetchReply();
 

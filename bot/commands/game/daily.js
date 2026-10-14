@@ -16,7 +16,6 @@ module.exports = {
     .setDescription("출석하고 돈 받자! 매일 밤 12시 갱신 💰"),
 
   async execute(interaction) {
-    await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
     const userId = interaction.user.id;
 
@@ -32,7 +31,7 @@ module.exports = {
       user = getUserOrFail(interaction, 0);   // 가입 여부만 체크
     } catch (err) {
       if (err.message === "NOT_REGISTERED") {
-        return interaction.editReply({
+        return interaction.reply({
           content: "아직 가입 안 했어!\n먼저 `/돈` 쳐서 지갑 만들어~",
           flags: MessageFlags.Ephemeral,
         });
@@ -47,7 +46,7 @@ module.exports = {
       const hours = Math.floor(diffMs / (1000 * 60 * 60));
       const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
 
-      return interaction.editReply({
+      return interaction.reply({
         content: `오늘 이미 출석했어.\n다음 출석까지 **${hours}시간 ${minutes}분** 남았어요!`,
         flags: MessageFlags.Ephemeral,
       });
@@ -102,6 +101,6 @@ module.exports = {
       .setFooter({ text: "매일 밤 12시에 초기화돼요!" })
       .setTimestamp();
 
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
   },
 };

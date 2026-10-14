@@ -11,7 +11,14 @@ module.exports = (client) => {
 
     const content = message.content.trim();
 
-    if (!/^[1-9]{4}$/.test(content) || new Set(content).size !== 4) return;
+    // 4자리 숫자인데 규칙에 어긋나면(0 포함·중복) 시도 횟수는 올리지 않고 이유를 알려 준다
+    if (/^\d{4}$/.test(content) && (!/^[1-9]{4}$/.test(content) || new Set(content).size !== 4)) {
+      await message
+        .reply("❌ **0이 없고 서로 다른 1~9 숫자 4개**만 입력할 수 있어요! (시도 횟수는 늘지 않았어요)")
+        .catch(() => {});
+      return;
+    }
+    if (!/^[1-9]{4}$/.test(content)) return;
 
     const game = games.get(message.author.id);
     if (!game) return; // 안전한 접근
