@@ -244,6 +244,8 @@ async function start() {
     }
   }
 
+  require("./bot/managers/monitor").startMonitor(client);
+
   // 봇을 실행할 때는 음악 서버(Lavalink)도 함께 실행한다 (명령어 등록 --deploy 등에서는 여기까지 오지 않는다)
   await require("./bot/managers/lavalinkProcess")
     .startLavalink()
