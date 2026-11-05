@@ -1,12 +1,32 @@
 const { SlashCommandBuilder, EmbedBuilder } = require("discord.js");
-const { kstDate, neisRows, requireSchool, addSchoolOption, schoolAutocomplete } = require("./neis");
+const {
+  kstDate,
+  neisRows,
+  requireSchool,
+  addSchoolOption,
+  schoolAutocomplete,
+} = require("./neis");
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("시간표")
     .setDescription("우리 학교 학급 시간표를 알려줘요!")
-    .addIntegerOption((o) => o.setName("학년").setDescription("학년").setRequired(true).setMinValue(1).setMaxValue(6))
-    .addIntegerOption((o) => o.setName("반").setDescription("반").setRequired(true).setMinValue(1).setMaxValue(20))
+    .addIntegerOption((o) =>
+      o
+        .setName("학년")
+        .setDescription("학년")
+        .setRequired(true)
+        .setMinValue(1)
+        .setMaxValue(6),
+    )
+    .addIntegerOption((o) =>
+      o
+        .setName("반")
+        .setDescription("반")
+        .setRequired(true)
+        .setMinValue(1)
+        .setMaxValue(20),
+    )
     .addStringOption((o) =>
       o
         .setName("날짜")
@@ -65,14 +85,19 @@ module.exports = {
         list.sort((a, b) => Number(a.PERIO) - Number(b.PERIO));
         embed.addFields({
           name: byDept.size > 1 ? `📚 ${dept}` : "📚 수업",
-          value: list.map((r) => `**${r.PERIO}교시** ${r.ITRT_CNTNT}`).join("\n").slice(0, 1024),
+          value: list
+            .map((r) => `**${r.PERIO}교시** ${r.ITRT_CNTNT}`)
+            .join("\n")
+            .slice(0, 1024),
           inline: byDept.size > 1,
         });
       }
       await interaction.editReply({ content: "", embeds: [embed] });
     } catch (e) {
       console.error("시간표 조회 오류:", e.message);
-      await interaction.editReply("🚨 시간표를 불러오는 중에 오류가 발생했어요. 잠시 후 다시 시도해 주세요.");
+      await interaction.editReply(
+        "🚨 시간표를 불러오는 중에 오류가 발생했어요. 잠시 후 다시 시도해 주세요.",
+      );
     }
   },
 };

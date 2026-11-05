@@ -23,10 +23,13 @@ function pickWeighted(table) {
 }
 
 /** 표의 기대 환수율(배율 평균). 표를 바꿀 때 93~95%인지 확인하는 데 쓴다 */
-const expectedReturn = (table) => table.reduce((sum, r) => sum + (r.weight / TOTAL) * r.mult, 0);
+const expectedReturn = (table) =>
+  table.reduce((sum, r) => sum + (r.weight / TOTAL) * r.mult, 0);
 
 const stmtUser = db.prepare("SELECT money FROM user WHERE user_id = ?");
-const stmtMoney = db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?");
+const stmtMoney = db.prepare(
+  "UPDATE user SET money = money + ? WHERE user_id = ?",
+);
 
 /** 잔액 확인 후 정산. 반환: { net, balance }. 가입 전이면 NOT_REGISTERED, 잔액 부족이면 INSUFFICIENT_MONEY */
 const settle = db.transaction((userId, bet, mult) => {
@@ -39,7 +42,8 @@ const settle = db.transaction((userId, bet, mult) => {
   return { net, balance: user.money + net };
 });
 
-const won = (net) => `${net > 0 ? "+" : net < 0 ? "-" : ""}${Math.abs(net).toLocaleString()}원`;
+const won = (net) =>
+  `${net > 0 ? "+" : net < 0 ? "-" : ""}${Math.abs(net).toLocaleString()}원`;
 
 /**
  * 한 판을 진행한다.
@@ -52,7 +56,10 @@ async function play(interaction, bet, roll, render) {
   try {
     result = settle(interaction.user.id, bet, outcome.mult);
   } catch (err) {
-    const content = err.message === "NOT_REGISTERED" ? "먼저 `/게임 가입`으로 가입해주세요!" : `💸 돈이 부족해요! (필요: ${bet.toLocaleString()}원)`;
+    const content =
+      err.message === "NOT_REGISTERED"
+        ? "먼저 `/게임 가입`으로 가입해주세요!"
+        : `💸 돈이 부족해요! (필요: ${bet.toLocaleString()}원)`;
     return interaction.reply({ content, flags: MessageFlags.Ephemeral });
   }
   if (bet >= PROGRESS_MIN_BET) progress.record(interaction.user.id, "play");
@@ -60,9 +67,19 @@ async function play(interaction, bet, roll, render) {
   const embed = new EmbedBuilder()
     .setColor(result.net > 0 ? 0x57f287 : result.net < 0 ? 0xed4245 : 0xfee75c)
     .setTitle(title)
-    .setDescription(`${description}\n\n💵 수익 **${won(result.net)}**\n💰 현재 잔액 **${result.balance.toLocaleString()}원**`)
+    .setDescription(
+      `${description}\n\n💵 수익 **${won(result.net)}**\n💰 현재 잔액 **${result.balance.toLocaleString()}원**`,
+    )
     .setTimestamp();
   return interaction.reply({ embeds: [embed] });
 }
 
-module.exports = { MIN_BET, PROGRESS_MIN_BET, TOTAL, pickWeighted, expectedReturn, play, won };
+module.exports = {
+  MIN_BET,
+  PROGRESS_MIN_BET,
+  TOTAL,
+  pickWeighted,
+  expectedReturn,
+  play,
+  won,
+};

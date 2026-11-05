@@ -3,7 +3,8 @@
 // 묶임에 들어간 파일은 단독 명령어로는 등록되지 않는다 (bot/commandLoader.js).
 const { PermissionFlagsBits } = require("discord.js");
 
-const cut = (text, max = 100) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
+const cut = (text, max = 100) =>
+  text.length > max ? `${text.slice(0, max - 1)}…` : text;
 
 /** 객체의 함수를 원래 대상에 묶어서 돌려주는 프록시 (discord.js 객체의 메서드는 this가 필요하다) */
 const bound = (target, overrides) =>
@@ -38,15 +39,33 @@ function makeGroup(spec) {
     if (entry.flatten) {
       for (const [newName, oldName] of Object.entries(entry.flatten)) {
         const sub = subs.find((s) => s.name === oldName);
-        if (!sub) throw new Error(`${spec.name}: ${json.name}에 하위 명령 ${oldName}이(가) 없어요`);
+        if (!sub)
+          throw new Error(
+            `${spec.name}: ${json.name}에 하위 명령 ${oldName}이(가) 없어요`,
+          );
         options.push({ ...sub, name: newName });
         routes.set(`/${newName}`, { module: mod, legacy: oldName, perms });
       }
     } else if (subs.length) {
-      options.push({ type: 2, name: entry.name, description: cut(entry.description ?? json.description), options: subs });
-      for (const s of subs) routes.set(`${entry.name}/${s.name}`, { module: mod, legacy: s.name, perms });
+      options.push({
+        type: 2,
+        name: entry.name,
+        description: cut(entry.description ?? json.description),
+        options: subs,
+      });
+      for (const s of subs)
+        routes.set(`${entry.name}/${s.name}`, {
+          module: mod,
+          legacy: s.name,
+          perms,
+        });
     } else {
-      options.push({ type: 1, name: entry.name, description: cut(entry.description ?? json.description), options: json.options ?? [] });
+      options.push({
+        type: 1,
+        name: entry.name,
+        description: cut(entry.description ?? json.description),
+        options: json.options ?? [],
+      });
       routes.set(`/${entry.name}`, { module: mod, legacy: null, perms });
     }
   }
@@ -54,10 +73,12 @@ function makeGroup(spec) {
   const names = options.map((o) => o.name);
   const dup = names.find((n, i) => names.indexOf(n) !== i);
   if (dup) throw new Error(`${spec.name}: 하위 명령 이름이 겹쳐요 (${dup})`);
-  if (options.length > 25) throw new Error(`${spec.name}: 하위 명령은 25개까지예요`);
+  if (options.length > 25)
+    throw new Error(`${spec.name}: 하위 명령은 25개까지예요`);
 
   const json = { name: spec.name, description: cut(spec.description), options };
-  if (spec.adminOnly) json.default_member_permissions = String(PermissionFlagsBits.Administrator);
+  if (spec.adminOnly)
+    json.default_member_permissions = String(PermissionFlagsBits.Administrator);
 
   /** 들어온 인터랙션을 맞는 파일이 기대하는 모양(옛 명령어 이름·하위 명령)으로 바꿔서 넘긴다 */
   const route = (interaction) => {
@@ -69,7 +90,14 @@ function makeGroup(spec) {
       getSubcommand: () => target.legacy,
       getSubcommandGroup: () => null,
     });
-    return { module: target.module, perms: target.perms, interaction: bound(interaction, { options, commandName: target.module.data.name }) };
+    return {
+      module: target.module,
+      perms: target.perms,
+      interaction: bound(interaction, {
+        options,
+        commandName: target.module.data.name,
+      }),
+    };
   };
 
   return {
@@ -77,9 +105,16 @@ function makeGroup(spec) {
     data: { name: spec.name, toJSON: () => json },
     async execute(interaction) {
       const r = route(interaction);
-      if (!r) return interaction.reply({ content: "알 수 없는 명령어예요.", flags: 64 });
+      if (!r)
+        return interaction.reply({
+          content: "알 수 없는 명령어예요.",
+          flags: 64,
+        });
       if (r.perms && !interaction.memberPermissions?.has(BigInt(r.perms))) {
-        return interaction.reply({ content: "이 명령어를 쓸 권한이 없어요.", flags: 64 });
+        return interaction.reply({
+          content: "이 명령어를 쓸 권한이 없어요.",
+          flags: 64,
+        });
       }
       return r.module.execute(r.interaction);
     },

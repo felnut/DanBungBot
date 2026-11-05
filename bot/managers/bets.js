@@ -13,10 +13,16 @@ db.exec(`
 `);
 
 const stmtHas = db.prepare("SELECT 1 FROM pending_bet WHERE user_id = ?");
-const stmtTake = db.prepare("UPDATE user SET money = money - ? WHERE user_id = ? AND money >= ?");
-const stmtPut = db.prepare("INSERT INTO pending_bet (user_id, amount, game, created_at) VALUES (?, ?, ?, ?)");
+const stmtTake = db.prepare(
+  "UPDATE user SET money = money - ? WHERE user_id = ? AND money >= ?",
+);
+const stmtPut = db.prepare(
+  "INSERT INTO pending_bet (user_id, amount, game, created_at) VALUES (?, ?, ?, ?)",
+);
 const stmtDel = db.prepare("DELETE FROM pending_bet WHERE user_id = ?");
-const stmtPay = db.prepare("UPDATE user SET money = money + ? WHERE user_id = ?");
+const stmtPay = db.prepare(
+  "UPDATE user SET money = money + ? WHERE user_id = ?",
+);
 
 const touchCache = (userId) => {
   cache.invalidateMoney(userId);

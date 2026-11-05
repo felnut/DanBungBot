@@ -1,6 +1,11 @@
 const { SlashCommandBuilder } = require("discord.js");
 const crypto = require("node:crypto");
-const { MIN_BET, TOTAL, pickWeighted, play } = require("../../managers/instantGame");
+const {
+  MIN_BET,
+  TOTAL,
+  pickWeighted,
+  play,
+} = require("../../managers/instantGame");
 
 // 777 0.8%×20 + 세 개 4%×5 + 두 개 14%×2 + 체리 한 개 30%×1 = 0.94 → 환수율 94%
 const OUTCOMES = [
@@ -15,7 +20,8 @@ const SYMBOLS = ["🍋", "🔔", "⭐", "🍇"]; // 체리(🍒)와 7️⃣은 �
 const sample = (arr, n) => {
   const pool = [...arr];
   const out = [];
-  while (out.length < n) out.push(pool.splice(crypto.randomInt(pool.length), 1)[0]);
+  while (out.length < n)
+    out.push(pool.splice(crypto.randomInt(pool.length), 1)[0]);
   return out;
 };
 const shuffle = (arr) => {
@@ -52,8 +58,16 @@ const TITLES = {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("슬롯")
-    .setDescription("슬롯머신! 777은 20배, 세 개 일치 5배, 두 개 일치 2배, 체리는 본전")
-    .addIntegerOption((o) => o.setName("금액").setDescription("베팅할 금액").setRequired(true).setMinValue(MIN_BET)),
+    .setDescription(
+      "슬롯머신! 777은 20배, 세 개 일치 5배, 두 개 일치 2배, 체리는 본전",
+    )
+    .addIntegerOption((o) =>
+      o
+        .setName("금액")
+        .setDescription("베팅할 금액")
+        .setRequired(true)
+        .setMinValue(MIN_BET),
+    ),
 
   async execute(interaction) {
     const bet = interaction.options.getInteger("금액");
@@ -61,7 +75,10 @@ module.exports = {
       interaction,
       bet,
       () => pickWeighted(OUTCOMES),
-      (o) => ({ title: TITLES[o.key], description: `┃ ${reelsFor(o.key).join(" ┃ ")} ┃` }),
+      (o) => ({
+        title: TITLES[o.key],
+        description: `┃ ${reelsFor(o.key).join(" ┃ ")} ┃`,
+      }),
     );
   },
 };

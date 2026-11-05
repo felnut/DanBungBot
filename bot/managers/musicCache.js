@@ -10,13 +10,25 @@ const DIR = path.join(__dirname, "../../music/cache");
 const PORT = Number(process.env.MUSIC_CACHE_PORT) || 2334;
 const BASE_URL = process.env.MUSIC_CACHE_BASE_URL || `http://127.0.0.1:${PORT}`;
 // 음원 파일 저장(복제)은 저작권 위험이 있어 기본값을 꺼짐(0)으로 한다. 켜려면 MUSIC_CACHE_MAX_MB에 용량(MB)을 지정한다
-const MAX_BYTES = (process.env.MUSIC_CACHE_MAX_MB === undefined ? 0 : Number(process.env.MUSIC_CACHE_MAX_MB)) * 1024 * 1024;
+const MAX_BYTES =
+  (process.env.MUSIC_CACHE_MAX_MB === undefined
+    ? 0
+    : Number(process.env.MUSIC_CACHE_MAX_MB)) *
+  1024 *
+  1024;
 const MAX_DURATION_S = (Number(process.env.MUSIC_CACHE_MAX_MINUTES) || 30) * 60; // 이보다 긴 영상은 저장하지 않음
 const DOWNLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
 const ID_RE = /^[A-Za-z0-9_-]{11}$/;
 const FILE_RE = /^[A-Za-z0-9_-]{11}\.(webm|m4a|opus|ogg|mp4|mp3)$/;
-const MIME = { webm: "audio/webm", m4a: "audio/mp4", mp4: "audio/mp4", opus: "audio/ogg", ogg: "audio/ogg", mp3: "audio/mpeg" };
+const MIME = {
+  webm: "audio/webm",
+  m4a: "audio/mp4",
+  mp4: "audio/mp4",
+  opus: "audio/ogg",
+  ogg: "audio/ogg",
+  mp3: "audio/mpeg",
+};
 
 const enabled = MAX_BYTES > 0;
 const inflight = new Set(); // 다운로드 중인 영상 ID
@@ -77,7 +89,8 @@ function remove(id) {
   if (!ID_RE.test(id)) return;
   const meta = readMeta(id);
   try {
-    if (meta && FILE_RE.test(meta.file || "")) fs.rmSync(path.join(DIR, meta.file), { force: true });
+    if (meta && FILE_RE.test(meta.file || ""))
+      fs.rmSync(path.join(DIR, meta.file), { force: true });
     fs.rmSync(metaPath(id), { force: true });
   } catch {
     /* 무시 */
@@ -147,15 +160,30 @@ function store(info, attempt = 1) {
       inflight.delete(id);
       // 유튜브가 일시적으로 거부(403 등)할 수 있어 한 번만 재시도
       if (err && attempt < 2) {
-        for (const f of fs.readdirSync(DIR)) if (f.startsWith(`${id}.`) && f !== `${id}.json`) fs.rmSync(path.join(DIR, f), { force: true });
+        for (const f of fs.readdirSync(DIR))
+          if (f.startsWith(`${id}.`) && f !== `${id}.json`)
+            fs.rmSync(path.join(DIR, f), { force: true });
         setTimeout(() => store(info, attempt + 1), 5000);
         return;
       }
-      const file = fs.readdirSync(DIR).find((f) => f.startsWith(`${id}.`) && FILE_RE.test(f));
+      const file = fs
+        .readdirSync(DIR)
+        .find((f) => f.startsWith(`${id}.`) && FILE_RE.test(f));
       if (err || !file) {
-        console.error("🎵 곡 저장 실패:", id, (stderr || err?.message || "").toString().split("\n").slice(-2).join(" ").slice(0, 200));
+        console.error(
+          "🎵 곡 저장 실패:",
+          id,
+          (stderr || err?.message || "")
+            .toString()
+            .split("\n")
+            .slice(-2)
+            .join(" ")
+            .slice(0, 200),
+        );
         // 남은 조각 파일 정리
-        for (const f of fs.readdirSync(DIR)) if (f.startsWith(`${id}.`) && f !== `${id}.json`) fs.rmSync(path.join(DIR, f), { force: true });
+        for (const f of fs.readdirSync(DIR))
+          if (f.startsWith(`${id}.`) && f !== `${id}.json`)
+            fs.rmSync(path.join(DIR, f), { force: true });
         return;
       }
       const size = fs.statSync(path.join(DIR, file)).size;
@@ -174,7 +202,9 @@ function store(info, attempt = 1) {
           lastUsed: Date.now(),
         }),
       );
-      console.log(`🎵 곡 저장 완료: ${info.title} (${(size / 1048576).toFixed(1)}MB)`);
+      console.log(
+        `🎵 곡 저장 완료: ${info.title} (${(size / 1048576).toFixed(1)}MB)`,
+      );
       evict();
     },
   );
@@ -253,15 +283,36 @@ function startCacheServer() {
         res.writeHead(416, { "Content-Range": `bytes */${st.size}` }).end();
         return;
       }
-      res.writeHead(206, { ...headers, "Content-Range": `bytes ${start}-${end}/${st.size}`, "Content-Length": end - start + 1 });
+      res.writeHead(206, {
+        ...headers,
+        "Content-Range": `bytes ${start}-${end}/${st.size}`,
+        "Content-Length": end - start + 1,
+      });
     } else {
       res.writeHead(200, { ...headers, "Content-Length": st.size });
     }
     if (req.method === "HEAD") return res.end();
-    fs.createReadStream(file, { start, end }).on("error", () => res.destroy()).pipe(res);
+    fs.createReadStream(file, { start, end })
+      .on("error", () => res.destroy())
+      .pipe(res);
   });
-  server.on("error", (e) => console.error(`🎵 캐시 서버 오류(포트 ${PORT}):`, e.message));
-  server.listen(PORT, "127.0.0.1", () => console.log(`🎵 곡 캐시 서버: 127.0.0.1:${PORT} (최대 ${Math.round(MAX_BYTES / 1048576)}MB)`));
+  server.on("error", (e) =>
+    console.error(`🎵 캐시 서버 오류(포트 ${PORT}):`, e.message),
+  );
+  server.listen(PORT, "127.0.0.1", () =>
+    console.log(
+      `🎵 곡 캐시 서버: 127.0.0.1:${PORT} (최대 ${Math.round(MAX_BYTES / 1048576)}MB)`,
+    ),
+  );
 }
 
-module.exports = { enabled, extractVideoId, find, remove, lookupSearch, saveSearch, store, startCacheServer };
+module.exports = {
+  enabled,
+  extractVideoId,
+  find,
+  remove,
+  lookupSearch,
+  saveSearch,
+  store,
+  startCacheServer,
+};

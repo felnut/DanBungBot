@@ -3,8 +3,16 @@ const { SlashCommandBuilder, MessageFlags } = require("discord.js");
 const MAX_LENGTH = 200;
 const MAX_DEPTH = 40;
 const FUNCTIONS = {
-  sqrt: Math.sqrt, abs: Math.abs, round: Math.round, floor: Math.floor, ceil: Math.ceil,
-  sin: Math.sin, cos: Math.cos, tan: Math.tan, log: Math.log10, ln: Math.log,
+  sqrt: Math.sqrt,
+  abs: Math.abs,
+  round: Math.round,
+  floor: Math.floor,
+  ceil: Math.ceil,
+  sin: Math.sin,
+  cos: Math.cos,
+  tan: Math.tan,
+  log: Math.log10,
+  ln: Math.log,
 };
 const CONSTANTS = { pi: Math.PI, 파이: Math.PI, e: Math.E };
 
@@ -13,7 +21,11 @@ const CONSTANTS = { pi: Math.PI, 파이: Math.PI, e: Math.E };
  * 지원: + - * / % ^ ( ), 소수, 함수 sqrt abs round floor ceil sin cos tan log ln, 상수 pi e
  */
 function evaluate(source) {
-  const text = source.replace(/[×x]/g, "*").replace(/÷/g, "/").replace(/\s+/g, "").toLowerCase();
+  const text = source
+    .replace(/[×x]/g, "*")
+    .replace(/÷/g, "/")
+    .replace(/\s+/g, "")
+    .toLowerCase();
   let pos = 0;
   let depth = 0;
   const fail = (msg) => {
@@ -94,13 +106,17 @@ function evaluate(source) {
   function additive() {
     let value = multiplicative();
     while (peek() === "+" || peek() === "-") {
-      value = text[pos++] === "+" ? value + multiplicative() : value - multiplicative();
+      value =
+        text[pos++] === "+"
+          ? value + multiplicative()
+          : value - multiplicative();
     }
     return value;
   }
 
   const result = additive();
-  if (pos < text.length) fail(`해석하지 못한 부분이 있어요: ${text.slice(pos, pos + 10)}`);
+  if (pos < text.length)
+    fail(`해석하지 못한 부분이 있어요: ${text.slice(pos, pos + 10)}`);
   if (!Number.isFinite(result)) fail("계산 결과가 너무 크거나 정의되지 않아요");
   return result;
 }
@@ -108,7 +124,8 @@ function evaluate(source) {
 /** 부동소수 오차를 줄여서 보기 좋게 만든다 */
 function format(value) {
   const rounded = Number(value.toPrecision(12));
-  if (Math.abs(rounded) >= 1e15 || (rounded !== 0 && Math.abs(rounded) < 1e-9)) return rounded.toExponential(6);
+  if (Math.abs(rounded) >= 1e15 || (rounded !== 0 && Math.abs(rounded) < 1e-9))
+    return rounded.toExponential(6);
   return rounded.toLocaleString("en-US", { maximumFractionDigits: 10 });
 }
 
@@ -116,16 +133,29 @@ module.exports = {
   evaluate,
   data: new SlashCommandBuilder()
     .setName("계산")
-    .setDescription("수식을 계산해줘요! (+ - * / % ^ 괄호, sqrt·abs·round 같은 함수)")
-    .addStringOption((o) => o.setName("수식").setDescription("예: (3+4)*2, 2^10, sqrt(144)").setRequired(true).setMaxLength(MAX_LENGTH)),
+    .setDescription(
+      "수식을 계산해줘요! (+ - * / % ^ 괄호, sqrt·abs·round 같은 함수)",
+    )
+    .addStringOption((o) =>
+      o
+        .setName("수식")
+        .setDescription("예: (3+4)*2, 2^10, sqrt(144)")
+        .setRequired(true)
+        .setMaxLength(MAX_LENGTH),
+    ),
 
   async execute(interaction) {
     const expr = interaction.options.getString("수식");
     try {
       const result = evaluate(expr);
-      return interaction.reply(`🧮 \`${expr.replace(/`/g, "'")}\`\n= **${format(result)}**`);
+      return interaction.reply(
+        `🧮 \`${expr.replace(/`/g, "'")}\`\n= **${format(result)}**`,
+      );
     } catch (err) {
-      return interaction.reply({ content: `❌ 계산하지 못했어요: ${err.message}`, flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        content: `❌ 계산하지 못했어요: ${err.message}`,
+        flags: MessageFlags.Ephemeral,
+      });
     }
   },
 };

@@ -11,7 +11,9 @@ async function applyNickname(guild) {
     if (!me || me.nickname === NICKNAME) return;
     if (me.nickname && !PREVIOUS_DEFAULTS.includes(me.nickname)) return; // 관리자가 정한 별명은 유지
     if (!me.permissions.has(PermissionFlagsBits.ChangeNickname)) {
-      console.warn(`봇 별명 변경 건너뜀: 서버 ${guild.id}에 '별명 변경' 권한이 없어요.`);
+      console.warn(
+        `봇 별명 변경 건너뜀: 서버 ${guild.id}에 '별명 변경' 권한이 없어요.`,
+      );
       return;
     }
     await me.setNickname(NICKNAME, "봇 기본 별명");

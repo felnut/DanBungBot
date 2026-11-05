@@ -15,7 +15,9 @@ const TIMETABLE_SERVICE = {
 const MAX_SCHOOLS = 5; // 서버당 등록할 수 있는 학교 수
 
 // 기본 학교가 맨 앞, 그 다음은 먼저 등록한 순서
-const stmtSchools = db.prepare("SELECT * FROM guild_schools WHERE guild_id = ? ORDER BY is_default DESC, registered_at ASC");
+const stmtSchools = db.prepare(
+  "SELECT * FROM guild_schools WHERE guild_id = ? ORDER BY is_default DESC, registered_at ASC",
+);
 
 function toSchool(r) {
   return {
@@ -58,7 +60,10 @@ async function schoolAutocomplete(interaction) {
   const choices = getSchools(interaction.guildId)
     .filter((s) => !typed || s.name.includes(typed))
     .slice(0, 25)
-    .map((s) => ({ name: `${s.isDefault ? "⭐ " : ""}${s.name} (${s.kind})`.slice(0, 100), value: s.code }));
+    .map((s) => ({
+      name: `${s.isDefault ? "⭐ " : ""}${s.name} (${s.kind})`.slice(0, 100),
+      value: s.code,
+    }));
   await interaction.respond(choices);
 }
 
@@ -70,7 +75,8 @@ async function requireSchool(interaction) {
   const schools = getSchools(interaction.guildId);
   if (!schools.length) {
     await interaction.reply({
-      content: "🏫 이 서버에 등록된 학교가 없어요. `/학교 등록 검색`으로 먼저 학교를 등록해 주세요.",
+      content:
+        "🏫 이 서버에 등록된 학교가 없어요. `/학교 등록 검색`으로 먼저 학교를 등록해 주세요.",
       flags: MessageFlags.Ephemeral,
     });
     return null;
@@ -80,7 +86,8 @@ async function requireSchool(interaction) {
   const school = schools.find((s) => s.code === picked);
   if (!school) {
     await interaction.reply({
-      content: "❌ 이 서버에 등록되지 않은 학교예요. `학교` 칸에서 목록에 뜨는 학교를 골라 주세요.",
+      content:
+        "❌ 이 서버에 등록되지 않은 학교예요. `학교` 칸에서 목록에 뜨는 학교를 골라 주세요.",
       flags: MessageFlags.Ephemeral,
     });
     return null;
@@ -104,7 +111,9 @@ function kstDate(offsetDays = 0, base = Date.now()) {
 
 /** YYYYMMDD → "10/20(화)" */
 function shortDate(ymd) {
-  const d = new Date(Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)));
+  const d = new Date(
+    Date.UTC(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8)),
+  );
   return `${+ymd.slice(4, 6)}/${+ymd.slice(6, 8)}(${WEEKDAYS[d.getUTCDay()]})`;
 }
 
@@ -115,22 +124,33 @@ function shortDate(ymd) {
 async function neisRows(school, service, params = {}, ttlMs = 30 * 60 * 1000) {
   const key = process.env.NEIS_KEY || process.env.NEIS_TOKEN;
   if (!key) throw new Error("NEIS API 키가 설정되지 않았어요.");
-  const base = school ? { ATPT_OFCDC_SC_CODE: school.atpt, SD_SCHUL_CODE: school.code } : {};
+  const base = school
+    ? { ATPT_OFCDC_SC_CODE: school.atpt, SD_SCHUL_CODE: school.code }
+    : {};
   const cacheKey = `neis:${service}:${JSON.stringify({ ...base, ...params })}`;
   return cache.getOrSet(cacheKey, ttlMs, async () => {
     let data;
     try {
       const res = await axios.get(`https://open.neis.go.kr/hub/${service}`, {
         timeout: 5000,
-        params: { KEY: key, Type: "json", pIndex: 1, pSize: 100, ...base, ...params },
+        params: {
+          KEY: key,
+          Type: "json",
+          pIndex: 1,
+          pSize: 100,
+          ...base,
+          ...params,
+        },
       });
       data = res.data;
     } catch (e) {
       throw new Error(`NEIS ${service} 요청 실패: ${e.message}`);
     }
-    const code = data?.RESULT?.CODE ?? data?.[service]?.[0]?.head?.[1]?.RESULT?.CODE;
+    const code =
+      data?.RESULT?.CODE ?? data?.[service]?.[0]?.head?.[1]?.RESULT?.CODE;
     if (code === "INFO-200") return []; // 해당 데이터 없음
-    if (code && code !== "INFO-000") throw new Error(`NEIS ${service} 오류: ${code}`);
+    if (code && code !== "INFO-000")
+      throw new Error(`NEIS ${service} 오류: ${code}`);
     return data?.[service]?.[1]?.row ?? [];
   });
 }

@@ -33,19 +33,26 @@ const {
 // DB 자동 연결 (초기화 및 마이그레이션 실행)
 const { GUILD_RANK_ENABLED } = require("./bot/config");
 const _db = require("./Database");
-const stmtTouchUser = _db.prepare("UPDATE user SET last_active = ? WHERE user_id = ?");
+const stmtTouchUser = _db.prepare(
+  "UPDATE user SET last_active = ? WHERE user_id = ?",
+);
 // 이용한 서버 기록 (지갑이 있는 이용자만) — '현재 서버' 랭킹용
 const stmtTouchGuild = _db.prepare(
   "INSERT INTO user_guild (guild_id, user_id, last_seen) SELECT ?, user_id, ? FROM user WHERE user_id = ? ON CONFLICT(guild_id, user_id) DO UPDATE SET last_seen = excluded.last_seen",
 );
 
 // 처리되지 않은 오류로 봇 전체가 종료되지 않도록 기록만 남긴다
-process.on("unhandledRejection", (reason) => console.error("처리되지 않은 Promise 거절:", reason));
-process.on("uncaughtException", (err) => console.error("처리되지 않은 예외:", err));
+process.on("unhandledRejection", (reason) =>
+  console.error("처리되지 않은 Promise 거절:", reason),
+);
+process.on("uncaughtException", (err) =>
+  console.error("처리되지 않은 예외:", err),
+);
 
 // 음악(Lavalink) 클라이언트 (Lavalink 서버가 꺼져 있어도 봇은 동작함)
 require("./bot/managers/musicManager").createMusicManager(client);
 require("./bot/managers/musicCache").startCacheServer(); // 곡 캐시 파일 서버 (Lavalink가 읽음)
+require("./bot/managers/siteApi").startSiteApi(); // 사이트 내 정보용 읽기 전용 API (SITE_API_TOKEN 설정 시)
 require("./bot/managers/ytdlp").warmup(); // yt-dlp 워커를 미리 띄워 첫 요청 지연 제거
 
 // ================== 커맨드 핸들러 초기화 ==================
@@ -77,11 +84,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
   // 음악 재생 패널 버튼
   if (interaction.isButton() && interaction.customId.startsWith("music:")) {
     try {
-      await require("./bot/managers/musicManager").handleMusicButton(interaction);
+      await require("./bot/managers/musicManager").handleMusicButton(
+        interaction,
+      );
     } catch (error) {
       console.error(error);
       if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({ content: "에러가 발생했습니다!", flags: [MessageFlags.Ephemeral] }).catch(() => {});
+        await interaction
+          .reply({
+            content: "에러가 발생했습니다!",
+            flags: [MessageFlags.Ephemeral],
+          })
+          .catch(() => {});
       }
     }
     return;
@@ -97,7 +111,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     // 마지막 이용 시각 기록 (12개월 미이용 계정 삭제 기준)
     const now = Date.now();
     stmtTouchUser.run(now, interaction.user.id);
-    if (GUILD_RANK_ENABLED && interaction.guildId) stmtTouchGuild.run(interaction.guildId, now, interaction.user.id);
+    if (GUILD_RANK_ENABLED && interaction.guildId)
+      stmtTouchGuild.run(interaction.guildId, now, interaction.user.id);
   } catch (error) {
     console.error(error);
     const errorMsg = {
@@ -126,7 +141,8 @@ client.once(Events.ClientReady, (c) => {
 
   // 이전 실행에서 정산되지 않은 블랙잭 베팅은 전액 돌려준다
   const refunded = require("./bot/managers/bets").refundPending();
-  if (refunded) console.log(`💸 정산되지 않은 베팅 ${refunded}건을 돌려줬어요.`);
+  if (refunded)
+    console.log(`💸 정산되지 않은 베팅 ${refunded}건을 돌려줬어요.`);
 
   // 봇 별명 자동 설정 (서버에 들어가면 "OMNI"로, 이미 별명이 있으면 그대로)
   require("./bot/managers/botNickname").startBotNickname(client);
@@ -217,11 +233,15 @@ async function start() {
   // "--list-admins": 등록된 서버 관리자 연락처 목록 출력 (운영자 전용, 이메일은 이 명령으로만 열람)
   if (process.argv.includes("--list-admins")) {
     const rows = require("./Database")
-      .prepare("SELECT guild_id, user_id, email, consented_at FROM admin_contact ORDER BY guild_id, user_id")
+      .prepare(
+        "SELECT guild_id, user_id, email, consented_at FROM admin_contact ORDER BY guild_id, user_id",
+      )
       .all();
     if (rows.length === 0) console.log("등록된 관리자가 없습니다.");
     for (const r of rows) {
-      console.log(`${r.guild_id}	${r.user_id}	${r.email}	${new Date(r.consented_at).toISOString()}`);
+      console.log(
+        `${r.guild_id}	${r.user_id}	${r.email}	${new Date(r.consented_at).toISOString()}`,
+      );
     }
     console.log(`
 총 ${rows.length}건 (서버ID / 사용자ID / 이메일 / 동의 시각)`);

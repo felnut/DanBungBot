@@ -1,7 +1,17 @@
 const { SlashCommandBuilder, MessageFlags } = require("discord.js");
-const { getMusicManager, refreshPanel, safeText } = require("../../managers/musicManager");
+const {
+  getMusicManager,
+  refreshPanel,
+  safeText,
+} = require("../../managers/musicManager");
 const { ResolveError } = require("../../managers/linkResolver");
-const { prepareTrack, schedulePrefetch, prefetchNow, suggest, failed } = require("../../managers/musicPrep");
+const {
+  prepareTrack,
+  schedulePrefetch,
+  prefetchNow,
+  suggest,
+  failed,
+} = require("../../managers/musicPrep");
 
 const DEFAULT_SOURCE = "youtube"; // 검색어일 때 기본으로 찾을 곳
 const SUGGEST_DEBOUNCE_MS = 350; // 입력이 이만큼 멈췄을 때만 검색 (타자 입력마다 검색하지 않음)
@@ -21,18 +31,21 @@ module.exports = {
       s
         .setName("재생")
         .setDescription("검색어나 URL로 음악을 큐에 추가")
-        .addStringOption((o) =>
-          o
-            .setName("검색어")
-            .setDescription("제목 또는 URL")
-            .setMaxLength(300)
-            .setRequired(true)
-            .setAutocomplete(true), // 입력하는 동안 곡을 미리 준비해 재생을 빠르게 함
+        .addStringOption(
+          (o) =>
+            o
+              .setName("검색어")
+              .setDescription("제목 또는 URL")
+              .setMaxLength(300)
+              .setRequired(true)
+              .setAutocomplete(true), // 입력하는 동안 곡을 미리 준비해 재생을 빠르게 함
         )
         .addStringOption((o) =>
           o
             .setName("소스")
-            .setDescription("검색어일 때 찾을 곳 (링크는 자동 인식, 기본: 유튜브)")
+            .setDescription(
+              "검색어일 때 찾을 곳 (링크는 자동 인식, 기본: 유튜브)",
+            )
             .addChoices(
               { name: "유튜브", value: "youtube" },
               { name: "사운드클라우드", value: "soundcloud" },
@@ -42,8 +55,12 @@ module.exports = {
     .addSubcommand((s) => s.setName("일시정지").setDescription("일시정지/재개"))
     .addSubcommand((s) => s.setName("스킵").setDescription("현재 곡 건너뛰기"))
     .addSubcommand((s) => s.setName("정지").setDescription("재생 중지 및 퇴장"))
-    .addSubcommand((s) => s.setName("큐").setDescription("지금 곡과 대기열 보기"))
-    .addSubcommand((s) => s.setName("섞기").setDescription("대기열을 무작위로 섞기"))
+    .addSubcommand((s) =>
+      s.setName("큐").setDescription("지금 곡과 대기열 보기"),
+    )
+    .addSubcommand((s) =>
+      s.setName("섞기").setDescription("대기열을 무작위로 섞기"),
+    )
     .addSubcommand((s) =>
       s
         .setName("반복")
@@ -53,14 +70,25 @@ module.exports = {
             .setName("모드")
             .setDescription("반복 방식")
             .setRequired(true)
-            .addChoices({ name: "끄기", value: "off" }, { name: "한 곡 반복", value: "track" }, { name: "대기열 반복", value: "queue" }),
+            .addChoices(
+              { name: "끄기", value: "off" },
+              { name: "한 곡 반복", value: "track" },
+              { name: "대기열 반복", value: "queue" },
+            ),
         ),
     )
     .addSubcommand((s) =>
       s
         .setName("볼륨")
         .setDescription("볼륨 설정 (0~100)")
-        .addIntegerOption((o) => o.setName("값").setDescription("0~100").setRequired(true).setMinValue(0).setMaxValue(100)),
+        .addIntegerOption((o) =>
+          o
+            .setName("값")
+            .setDescription("0~100")
+            .setRequired(true)
+            .setMinValue(0)
+            .setMaxValue(100),
+        ),
     ),
 
   // 검색어를 입력(붙여넣기)하는 동안 호출됨.
@@ -68,7 +96,10 @@ module.exports = {
   //  - 검색어: 상위 5개 결과를 선택지로 보여 주고, 맨 위 결과를 미리 준비해 둔다
   async autocomplete(interaction) {
     const focused = interaction.options.getFocused(true);
-    if (interaction.options.getSubcommand() !== "재생" || focused.name !== "검색어") {
+    if (
+      interaction.options.getSubcommand() !== "재생" ||
+      focused.name !== "검색어"
+    ) {
       return interaction.respond([]);
     }
     const text = focused.value.trim();
@@ -101,7 +132,12 @@ module.exports = {
       choices = null;
     }
     if (isStale()) return reply([]);
-    if (!choices) return reply(text.length <= 100 ? [{ name: `🔎 ${text}`.slice(0, 100), value: text }] : []);
+    if (!choices)
+      return reply(
+        text.length <= 100
+          ? [{ name: `🔎 ${text}`.slice(0, 100), value: text }]
+          : [],
+      );
 
     if (choices.length) prefetchNow(choices[0].value, source); // 맨 위 결과를 미리 준비 (엔터만 눌러도 빠르게)
     return reply(choices);
@@ -109,7 +145,9 @@ module.exports = {
 
   async execute(interaction) {
     const manager = getMusicManager();
-    const nodeUp = manager && [...manager.nodeManager.nodes.values()].some((n) => n.connected);
+    const nodeUp =
+      manager &&
+      [...manager.nodeManager.nodes.values()].some((n) => n.connected);
     if (!nodeUp) {
       return interaction.reply({
         content: "음악 서버(Lavalink)에 연결되어 있지 않아요.",
@@ -139,7 +177,8 @@ module.exports = {
       await interaction.reply("🔎 곡을 찾는 중…");
       const ackMs = Date.now() - interaction.createdTimestamp; // 명령 입력 후 응답까지 걸린 시간
       const startedAt = Date.now();
-      if (ackMs > 800) console.warn(`⚠️ /음악 재생 응답이 느립니다: ${ackMs}ms`);
+      if (ackMs > 800)
+        console.warn(`⚠️ /음악 재생 응답이 느립니다: ${ackMs}ms`);
       const query = interaction.options.getString("검색어");
       const source = interaction.options.getString("소스") ?? DEFAULT_SOURCE;
 
@@ -153,7 +192,9 @@ module.exports = {
       }
 
       // 음성 채널 접속과 곡 준비(해석 + Lavalink 로드)를 동시에 진행한다
-      const connecting = player.connected ? Promise.resolve() : player.connect();
+      const connecting = player.connected
+        ? Promise.resolve()
+        : player.connect();
       const preparing = prepareTrack(query, source, interaction.user);
       connecting.catch(() => {}); // 한쪽이 먼저 실패해도 다른 쪽의 늦은 거절이 처리되지 않은 오류가 되지 않게
       preparing.catch(() => {});
@@ -163,7 +204,8 @@ module.exports = {
         [, prepared] = await Promise.all([connecting, preparing]);
       } catch (e) {
         if (!player.queue.current) await player.destroy().catch(() => {});
-        if (e instanceof ResolveError) return interaction.editReply(e.userMessage);
+        if (e instanceof ResolveError)
+          return interaction.editReply(e.userMessage);
         throw e;
       }
 
@@ -179,14 +221,17 @@ module.exports = {
         await player.queue.add(res.tracks[0]);
       }
       // 재생 시작을 먼저 하고, 안내 메시지 수정은 기다리지 않는다 (소리가 나기까지의 시간을 줄임)
-      const playing = !player.playing && !player.paused ? player.play() : Promise.resolve();
+      const playing =
+        !player.playing && !player.paused ? player.play() : Promise.resolve();
       const notice =
         res.loadType === "playlist"
           ? `📃 플레이리스트 **${safeText(res.playlist?.title)}** ${res.tracks.length}곡 추가`
           : `➕ 큐에 추가: **${safeText(res.tracks[0].info.title)}** (${fmt(res.tracks[0].info.duration)})`;
       interaction.editReply(notice).catch(() => {});
       await playing;
-      console.log(`🎵 /음악 재생 준비 ${Date.now() - startedAt}ms (응답 ${ackMs}ms 후, 총 ${Date.now() - interaction.createdTimestamp}ms)`);
+      console.log(
+        `🎵 /음악 재생 준비 ${Date.now() - startedAt}ms (응답 ${ackMs}ms 후, 총 ${Date.now() - interaction.createdTimestamp}ms)`,
+      );
       return;
     }
 
@@ -211,15 +256,26 @@ module.exports = {
         return interaction.reply("⏹️ 재생을 멈추고 나갔어요.");
       case "섞기":
         if (player.queue.tracks.length < 2) {
-          return interaction.reply({ content: "섞을 곡이 부족해요. (대기열 2곡 이상)", flags: MessageFlags.Ephemeral });
+          return interaction.reply({
+            content: "섞을 곡이 부족해요. (대기열 2곡 이상)",
+            flags: MessageFlags.Ephemeral,
+          });
         }
         await player.queue.shuffle();
         refreshPanel(player);
-        return interaction.reply(`🔀 대기열 ${player.queue.tracks.length}곡을 섞었어요.`);
+        return interaction.reply(
+          `🔀 대기열 ${player.queue.tracks.length}곡을 섞었어요.`,
+        );
       case "반복": {
         const mode = interaction.options.getString("모드");
         await player.setRepeatMode(mode);
-        return interaction.reply({ off: "➡️ 반복을 껐어요.", track: "🔂 한 곡을 반복해요.", queue: "🔁 대기열을 반복해요." }[mode]);
+        return interaction.reply(
+          {
+            off: "➡️ 반복을 껐어요.",
+            track: "🔂 한 곡을 반복해요.",
+            queue: "🔁 대기열을 반복해요.",
+          }[mode],
+        );
       }
       case "볼륨": {
         const v = interaction.options.getInteger("값");
@@ -236,10 +292,18 @@ module.exports = {
         }
         const next = player.queue.tracks
           .slice(0, 10)
-          .map((t, i) => `${i + 1}. ${safeText(t.info.title)} (${fmt(t.info.duration)})`);
+          .map(
+            (t, i) =>
+              `${i + 1}. ${safeText(t.info.title)} (${fmt(t.info.duration)})`,
+          );
         const more = player.queue.tracks.length - 10;
-        const len = cur.info.isStream ? "🔴 LIVE" : `${fmt(Math.min(player.position ?? 0, cur.info.duration || 0))} / ${fmt(cur.info.duration)}`;
-        const repeat = { off: "반복 끔", track: "한 곡 반복", queue: "대기열 반복" }[player.repeatMode] ?? "반복 끔";
+        const len = cur.info.isStream
+          ? "🔴 LIVE"
+          : `${fmt(Math.min(player.position ?? 0, cur.info.duration || 0))} / ${fmt(cur.info.duration)}`;
+        const repeat =
+          { off: "반복 끔", track: "한 곡 반복", queue: "대기열 반복" }[
+            player.repeatMode
+          ] ?? "반복 끔";
         return interaction.reply(
           `🎶 **${safeText(cur.info.title)}** · ${len} · 🔊 ${player.volume}% · 🔁 ${repeat}\n${next.join("\n") || "대기열이 비어 있어요."}${more > 0 ? `\n… 외 ${more}곡` : ""}`,
         );

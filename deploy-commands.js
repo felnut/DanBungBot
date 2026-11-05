@@ -77,7 +77,10 @@ const dmCommands = []; // DM 전용 명령어
 for (const command of require("./bot/commandLoader").loadCommands()) {
   const json = command.data.toJSON();
   // DM 전용(봇과의 1:1 대화에서만 쓰는) 명령어는 서버가 아니라 전역으로 등록해야 DM에 나타난다
-  const dmOnly = Array.isArray(json.contexts) && json.contexts.length > 0 && json.contexts.every((c) => c === InteractionContextType.BotDM);
+  const dmOnly =
+    Array.isArray(json.contexts) &&
+    json.contexts.length > 0 &&
+    json.contexts.every((c) => c === InteractionContextType.BotDM);
   (dmOnly ? dmCommands : commands).push(json);
 }
 
@@ -95,17 +98,27 @@ async function deployCommands() {
     // 등록 대상: .env의 GUILD_ID + 봇이 들어가 있는 모든 서버 (서버마다 따로 등록해야 명령어가 갱신된다)
     const targets = new Map([[process.env.GUILD_ID, "GUILD_ID"]]);
     try {
-      const joined = await rest.get(Routes.userGuilds(), { query: new URLSearchParams({ limit: "200" }) });
+      const joined = await rest.get(Routes.userGuilds(), {
+        query: new URLSearchParams({ limit: "200" }),
+      });
       for (const g of joined) if (!targets.has(g.id)) targets.set(g.id, g.name);
     } catch (e) {
-      console.warn("참여 중인 서버 목록을 가져오지 못해 GUILD_ID 서버에만 등록합니다:", e?.message || e);
+      console.warn(
+        "참여 중인 서버 목록을 가져오지 못해 GUILD_ID 서버에만 등록합니다:",
+        e?.message || e,
+      );
     }
 
-    console.log(`${commands.length}개의 명령어를 디스코드에 등록하는 중... (서버 ${targets.size}곳)`);
+    console.log(
+      `${commands.length}개의 명령어를 디스코드에 등록하는 중... (서버 ${targets.size}곳)`,
+    );
     let failed = 0;
     for (const [guildId, label] of targets) {
       try {
-        await rest.put(Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId), { body: commands });
+        await rest.put(
+          Routes.applicationGuildCommands(process.env.CLIENT_ID, guildId),
+          { body: commands },
+        );
         console.log(`  ✅ ${label} (${guildId})`);
       } catch (e) {
         failed += 1;
@@ -115,15 +128,23 @@ async function deployCommands() {
     }
     // 전역 명령어는 DM 전용 명령어만 담는다 (서버 명령어는 위처럼 서버별로 등록)
     try {
-      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), { body: dmCommands });
-      console.log(`  ✅ DM 전용 명령어 ${dmCommands.length}개 (전역 등록 — 디스코드에 반영되기까지 잠시 걸릴 수 있어요)`);
+      await rest.put(Routes.applicationCommands(process.env.CLIENT_ID), {
+        body: dmCommands,
+      });
+      console.log(
+        `  ✅ DM 전용 명령어 ${dmCommands.length}개 (전역 등록 — 디스코드에 반영되기까지 잠시 걸릴 수 있어요)`,
+      );
     } catch (e) {
       failed += 1;
       console.error(`  ❌ DM 전용 명령어: ${e?.message || e}`);
     }
 
     if (failed === targets.size + 1) return false;
-    console.log(failed ? `⚠️ 일부 서버(${failed}곳)는 등록에 실패했어요.` : "✅ 명령어 등록 성공!");
+    console.log(
+      failed
+        ? `⚠️ 일부 서버(${failed}곳)는 등록에 실패했어요.`
+        : "✅ 명령어 등록 성공!",
+    );
     return true; // 성공 반환
   } catch (error) {
     if (error?.status === 401) {

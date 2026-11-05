@@ -7,7 +7,9 @@ const db = require("../../../Database");
 const { getUserOrFail } = require("../utils/user");
 const cache = require("../utils/cache");
 
-const stmtSelectReceiver = db.prepare("SELECT money FROM user WHERE user_id = ?");
+const stmtSelectReceiver = db.prepare(
+  "SELECT money FROM user WHERE user_id = ?",
+);
 const stmtUpdateMoneyDelta = db.prepare(
   "UPDATE user SET money = money + ? WHERE user_id = ?",
 );
@@ -36,7 +38,6 @@ module.exports = {
     ),
 
   async execute(interaction) {
-
     const target = interaction.options.getUser("유저");
     const amount = interaction.options.getInteger("금액");
 
@@ -77,7 +78,10 @@ module.exports = {
 
     // 부계정으로 몰아주기 방지: 최근 24시간 송금 합계 한도
     const now = Date.now();
-    const sentToday = stmtSentSince.get(sender.user_id, now - 24 * 60 * 60 * 1000).total;
+    const sentToday = stmtSentSince.get(
+      sender.user_id,
+      now - 24 * 60 * 60 * 1000,
+    ).total;
     if (sentToday + amount > DAILY_SEND_LIMIT) {
       const left = Math.max(DAILY_SEND_LIMIT - sentToday, 0);
       return interaction.reply({
@@ -101,7 +105,8 @@ module.exports = {
 
     cache.invalidateMoney(sender.user_id, target.id);
     // 다른 계정에 보내면 비용이 들지 않으므로 100원 이상만 세고 하루 횟수도 제한한다 (progress.js)
-    if (amount >= 100) require("../../managers/progress").record(sender.user_id, "transfer");
+    if (amount >= 100)
+      require("../../managers/progress").record(sender.user_id, "transfer");
 
     const embed = new EmbedBuilder()
       .setColor("#3498db")

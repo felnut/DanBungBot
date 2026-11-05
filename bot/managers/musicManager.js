@@ -16,11 +16,16 @@ const PANEL_COLOR = 0x5865f2;
 
 /** 외부(영상 제목 등)에서 온 글자를 안전하게: 마크다운·링크 문법을 무력화하고 길이를 제한한다 (피싱 링크·서식 위장 방지) */
 const safeText = (t, max = 100) => {
-  const s = String(t ?? "").replace(/[\u0000-\u001f\u007f]/g, " ").slice(0, max);
+  const s = String(t ?? "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .slice(0, max);
   return s.replace(/([\\*_~`|>\[\]()#<])/g, "\\$1");
 };
 /** 임베드 링크·이미지는 http(s)만 허용 */
-const safeUrl = (u) => (typeof u === "string" && /^https?:\/\//i.test(u) && u.length <= 512 ? u : null);
+const safeUrl = (u) =>
+  typeof u === "string" && /^https?:\/\//i.test(u) && u.length <= 512
+    ? u
+    : null;
 
 const fmt = (ms) => {
   const s = Math.max(0, Math.floor(ms / 1000));
@@ -44,7 +49,11 @@ function panelPayload(player) {
     .setTitle(String(info.title ?? "").slice(0, 256))
     .setDescription(`**${safeText(info.author || "알 수 없음", 100)}**`)
     .addFields(
-      { name: "길이", value: info.isStream ? "🔴 LIVE" : fmt(info.duration), inline: true },
+      {
+        name: "길이",
+        value: info.isStream ? "🔴 LIVE" : fmt(info.duration),
+        inline: true,
+      },
       {
         name: "신청자",
         value: track.requester?.id ? `<@${track.requester.id}>` : "-",
@@ -57,8 +66,9 @@ function panelPayload(player) {
     embed.addFields({
       name: "다음 곡",
       value:
-        upcoming.map((t, i) => `${i + 1}. ${safeText(t.info.title)}`).join("\n") +
-        (more > 0 ? `\n… 외 ${more}곡` : ""),
+        upcoming
+          .map((t, i) => `${i + 1}. ${safeText(t.info.title)}`)
+          .join("\n") + (more > 0 ? `\n… 외 ${more}곡` : ""),
     });
   }
 
@@ -68,9 +78,21 @@ function panelPayload(player) {
       .setEmoji(player.paused ? "▶️" : "⏸️")
       .setLabel(player.paused ? "재개" : "일시정지")
       .setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("music:skip").setEmoji("⏭️").setLabel("스킵").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("music:stop").setEmoji("⏹️").setLabel("정지").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId("music:queue").setEmoji("📃").setLabel("대기열").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("music:skip")
+      .setEmoji("⏭️")
+      .setLabel("스킵")
+      .setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder()
+      .setCustomId("music:stop")
+      .setEmoji("⏹️")
+      .setLabel("정지")
+      .setStyle(ButtonStyle.Danger),
+    new ButtonBuilder()
+      .setCustomId("music:queue")
+      .setEmoji("📃")
+      .setLabel("대기열")
+      .setStyle(ButtonStyle.Secondary),
   );
 
   return { embeds: [embed], components: [row1] };
@@ -101,7 +123,10 @@ async function handleMusicButton(interaction) {
   const action = interaction.customId.split(":")[1];
   const player = manager?.getPlayer(interaction.guildId);
   if (!player || !player.queue.current) {
-    return interaction.reply({ content: "재생 중인 음악이 없어요.", flags: MessageFlags.Ephemeral });
+    return interaction.reply({
+      content: "재생 중인 음악이 없어요.",
+      flags: MessageFlags.Ephemeral,
+    });
   }
   if (interaction.member.voice?.channelId !== player.voiceChannelId) {
     return interaction.reply({
@@ -126,7 +151,10 @@ async function handleMusicButton(interaction) {
       const cur = player.queue.current;
       const list = player.queue.tracks
         .slice(0, 15)
-        .map((t, i) => `${i + 1}. ${safeText(t.info.title)} (${fmt(t.info.duration)})`);
+        .map(
+          (t, i) =>
+            `${i + 1}. ${safeText(t.info.title)} (${fmt(t.info.duration)})`,
+        );
       const more = player.queue.tracks.length - 15;
       const embed = new EmbedBuilder()
         .setColor(PANEL_COLOR)
@@ -136,7 +164,10 @@ async function handleMusicButton(interaction) {
             (list.length ? list.join("\n") : "대기열이 비어 있어요.") +
             (more > 0 ? `\n… 외 ${more}곡` : ""),
         );
-      return interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
+      return interaction.reply({
+        embeds: [embed],
+        flags: MessageFlags.Ephemeral,
+      });
     }
   }
 }
@@ -146,7 +177,9 @@ function createMusicManager(client) {
   // 기본 비밀번호(CHANGE_ME)나 빈 값으로는 Lavalink에 연결하지 않는다 (같은 PC의 다른 프로그램이 접속하는 것을 막기 위함)
   const pw = process.env.LAVALINK_PASSWORD;
   if (!pw || pw === "CHANGE_ME") {
-    console.warn("🎵 LAVALINK_PASSWORD가 없거나 기본값(CHANGE_ME)이라 음악 기능을 끕니다. .env와 music/application.yml의 비밀번호를 바꿔 주세요.");
+    console.warn(
+      "🎵 LAVALINK_PASSWORD가 없거나 기본값(CHANGE_ME)이라 음악 기능을 끕니다. .env와 music/application.yml의 비밀번호를 바꿔 주세요.",
+    );
     return null;
   }
   manager = new LavalinkManager({
@@ -181,9 +214,15 @@ function createMusicManager(client) {
 
   // 재생 실패 시 안내 (유튜브가 스트림을 막는 경우 등)
   manager.on("trackError", (player, track, payload) => {
-    console.error("🎵 재생 오류:", track?.info?.title, payload?.exception?.message);
+    console.error(
+      "🎵 재생 오류:",
+      track?.info?.title,
+      payload?.exception?.message,
+    );
     const ch = client.channels.cache.get(player.textChannelId);
-    ch?.send(`⚠️ **${safeText(track?.info?.title ?? "곡")}** 을(를) 재생하지 못했어요. 다른 곡을 시도해 주세요.`).catch(() => {});
+    ch?.send(
+      `⚠️ **${safeText(track?.info?.title ?? "곡")}** 을(를) 재생하지 못했어요. 다른 곡을 시도해 주세요.`,
+    ).catch(() => {});
   });
 
   // 곡이 시작될 때마다 패널을 채팅창 맨 아래로 새로 보낸다
@@ -211,7 +250,12 @@ function createMusicManager(client) {
       .catch((e) => console.error("🎧 자동 추천 오류:", e?.message));
   });
   manager.on("playerDestroy", (player, reason) =>
-    closePanel(player.guildId, reason === "channelEmpty" ? "👋 아무도 없어서 나갔어요" : "⏹️ 재생을 멈췄어요"),
+    closePanel(
+      player.guildId,
+      reason === "channelEmpty"
+        ? "👋 아무도 없어서 나갔어요"
+        : "⏹️ 재생을 멈췄어요",
+    ),
   );
 
   // 음성 채널에 사람이 없으면 퇴장
@@ -233,4 +277,10 @@ function getMusicManager() {
   return manager;
 }
 
-module.exports = { safeText, createMusicManager, getMusicManager, handleMusicButton, refreshPanel };
+module.exports = {
+  safeText,
+  createMusicManager,
+  getMusicManager,
+  handleMusicButton,
+  refreshPanel,
+};

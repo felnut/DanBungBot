@@ -9,7 +9,8 @@ const SUITS = ["♠", "♥", "♦", "♣"];
 
 function newShoe(decks = 6) {
   const shoe = [];
-  for (let d = 0; d < decks; d++) for (const s of SUITS) for (let r = 1; r <= 13; r++) shoe.push({ r, s });
+  for (let d = 0; d < decks; d++)
+    for (const s of SUITS) for (let r = 1; r <= 13; r++) shoe.push({ r, s });
   for (let i = shoe.length - 1; i > 0; i--) {
     const j = crypto.randomInt(i + 1);
     [shoe[i], shoe[j]] = [shoe[j], shoe[i]];
@@ -17,7 +18,8 @@ function newShoe(decks = 6) {
   return shoe;
 }
 
-const label = (c) => `${{ 1: "A", 11: "J", 12: "Q", 13: "K" }[c.r] ?? c.r}${c.s}`;
+const label = (c) =>
+  `${{ 1: "A", 11: "J", 12: "Q", 13: "K" }[c.r] ?? c.r}${c.s}`;
 const cardValue = (c) => Math.min(c.r, 10);
 
 /** 손패 합계. A는 11로 쳐도 21을 넘지 않으면 11 (soft) */
@@ -52,9 +54,12 @@ function settle(player, dealer) {
   const p = handValue(player).total;
   const d = handValue(dealer).total;
   if (isBlackjack(player)) {
-    return isBlackjack(dealer) ? { mult: 1, result: "push", reason: "둘 다 블랙잭" } : { ...win, reason: "블랙잭!" };
+    return isBlackjack(dealer)
+      ? { mult: 1, result: "push", reason: "둘 다 블랙잭" }
+      : { ...win, reason: "블랙잭!" };
   }
-  if (isBlackjack(dealer)) return { mult: 0, result: "lose", reason: "딜러 블랙잭" };
+  if (isBlackjack(dealer))
+    return { mult: 0, result: "lose", reason: "딜러 블랙잭" };
   if (p > 21) return { mult: 0, result: "lose", reason: "버스트" };
   if (d > 21) return { ...win, reason: "딜러 버스트" };
   if (p > d) return { ...win, reason: "숫자가 더 커요" };
@@ -65,4 +70,13 @@ function settle(player, dealer) {
 /** 베팅액에 대한 실제 지급액 (원 단위 내림) */
 const payoutOf = (bet, mult) => Math.floor(bet * mult);
 
-module.exports = { COMMISSION, newShoe, label, handValue, isBlackjack, dealerPlay, settle, payoutOf };
+module.exports = {
+  COMMISSION,
+  newShoe,
+  label,
+  handValue,
+  isBlackjack,
+  dealerPlay,
+  settle,
+  payoutOf,
+};

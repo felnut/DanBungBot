@@ -4,7 +4,7 @@ const { PermissionFlagsBits } = require("discord.js");
 function isServerAdmin(interaction) {
   return Boolean(
     interaction.guild?.ownerId === interaction.user.id ||
-      interaction.memberPermissions?.has(PermissionFlagsBits.Administrator),
+    interaction.memberPermissions?.has(PermissionFlagsBits.Administrator),
   );
 }
 
@@ -14,7 +14,8 @@ function isServerAdmin(interaction) {
  */
 function isServerManager(interaction) {
   return Boolean(
-    isServerAdmin(interaction) || interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild),
+    isServerAdmin(interaction) ||
+    interaction.memberPermissions?.has(PermissionFlagsBits.ManageGuild),
   );
 }
 

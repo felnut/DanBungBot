@@ -10,22 +10,36 @@ require("dotenv").config({ path: path.join(ROOT, ".env"), quiet: true }); // 초
 // 명령어 파일들이 불러오는 Database.js를 가짜 객체로 바꿔서 game.db에 접속하지 않게 한다
 const makeStub = () =>
   new Proxy(function () {}, {
-    get: (_, key) => (key === "then" ? undefined : key === Symbol.toPrimitive ? () => "stub" : makeStub()),
+    get: (_, key) =>
+      key === "then"
+        ? undefined
+        : key === Symbol.toPrimitive
+          ? () => "stub"
+          : makeStub(),
     apply: () => makeStub(),
     construct: () => makeStub(),
   });
 const dbPath = require.resolve(path.join(ROOT, "Database.js"));
-require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: makeStub() };
+require.cache[dbPath] = {
+  id: dbPath,
+  filename: dbPath,
+  loaded: true,
+  exports: makeStub(),
+};
 
 const { PermissionFlagsBits: P } = require("discord.js");
-const { CATEGORIES, groupByCategory, usageOf } = require(path.join(ROOT, "bot/commandInfo.js"));
+const { CATEGORIES, groupByCategory, usageOf } = require(
+  path.join(ROOT, "bot/commandInfo.js"),
+);
 
 // ---------- 명령어 읽기 ----------
 const commands = require(path.join(ROOT, "bot/commandLoader.js"))
   .loadCommands()
   .map((mod) => ({ name: mod.data.name, json: mod.data.toJSON() }));
 
-const ownerOnly = new Set(CATEGORIES.filter((c) => c.ownerOnly).flatMap((c) => c.names));
+const ownerOnly = new Set(
+  CATEGORIES.filter((c) => c.ownerOnly).flatMap((c) => c.names),
+);
 const publicCommands = commands.filter((c) => !ownerOnly.has(c.name)); // 봇 운영자 전용 명령어는 사이트에 싣지 않는다
 const groups = groupByCategory(publicCommands);
 
@@ -48,10 +62,18 @@ const siteCommands = {
 // ---------- 초대 주소 ----------
 // 봇이 하는 일에 필요한 권한만 요청한다 (관리자 권한은 요청하지 않는다)
 const PERMISSIONS = [
-  P.ViewChannel, P.SendMessages, P.SendMessagesInThreads, P.EmbedLinks, P.ReadMessageHistory,
-  P.Connect, P.Speak, // 음악
-  P.ManageMessages, P.ManageChannels, // 메시지 정리, 슬로우모드·채널 잠금
-  P.KickMembers, P.BanMembers, P.ModerateMembers, // 추방·차단·타임아웃
+  P.ViewChannel,
+  P.SendMessages,
+  P.SendMessagesInThreads,
+  P.EmbedLinks,
+  P.ReadMessageHistory,
+  P.Connect,
+  P.Speak, // 음악
+  P.ManageMessages,
+  P.ManageChannels, // 메시지 정리, 슬로우모드·채널 잠금
+  P.KickMembers,
+  P.BanMembers,
+  P.ModerateMembers, // 추방·차단·타임아웃
   P.ChangeNickname, // 서버 별명(OMNI) 자동 설정
 ];
 const permissions = PERMISSIONS.reduce((sum, p) => sum | p, 0n).toString();
@@ -64,7 +86,10 @@ const bot = {
   name: "OMNI",
   command_total: siteCommands.total,
   category_total: groups.length,
-  subcommand_total: publicCommands.reduce((n, c) => n + Math.max(usageOf(c.json).usages.length, 1), 0),
+  subcommand_total: publicCommands.reduce(
+    (n, c) => n + Math.max(usageOf(c.json).usages.length, 1),
+    0,
+  ),
   invite_url: invite,
   invite_permissions: permissions,
   contact: "dev@felnut.com",
@@ -73,15 +98,31 @@ const bot = {
 };
 
 // 사이트 폴더: 기본은 이 저장소 옆의 02_OMNI-Bot_site
-const SITE_DIR = path.resolve(process.env.SITE_DIR || path.join(ROOT, "..", "02_OMNI-Bot_site"));
+const SITE_DIR = path.resolve(
+  process.env.SITE_DIR || path.join(ROOT, "..", "02_OMNI-Bot_site"),
+);
 if (!fs.existsSync(SITE_DIR)) {
-  console.error(`❌ 사이트 폴더를 찾지 못했어요: ${SITE_DIR}\nSITE_DIR=사이트폴더경로 로 위치를 알려 주세요.`);
+  console.error(
+    `❌ 사이트 폴더를 찾지 못했어요: ${SITE_DIR}\nSITE_DIR=사이트폴더경로 로 위치를 알려 주세요.`,
+  );
   process.exit(1);
 }
 const dataDir = path.join(SITE_DIR, "_data");
 fs.mkdirSync(dataDir, { recursive: true });
-fs.writeFileSync(path.join(dataDir, "commands.json"), JSON.stringify(siteCommands, null, 2) + "\n");
-fs.writeFileSync(path.join(dataDir, "bot.json"), JSON.stringify(bot, null, 2) + "\n");
-console.log(`명령어 ${bot.command_total}개(사용법 ${bot.subcommand_total}개), 분류 ${bot.category_total}개 → ${path.join(dataDir, "commands.json")}`);
-console.log(invite ? `초대 주소 생성 (권한 ${permissions}) → ${path.join(dataDir, "bot.json")}` : "⚠️ CLIENT_ID가 없어 초대 주소를 만들지 못했어요");
+fs.writeFileSync(
+  path.join(dataDir, "commands.json"),
+  JSON.stringify(siteCommands, null, 2) + "\n",
+);
+fs.writeFileSync(
+  path.join(dataDir, "bot.json"),
+  JSON.stringify(bot, null, 2) + "\n",
+);
+console.log(
+  `명령어 ${bot.command_total}개(사용법 ${bot.subcommand_total}개), 분류 ${bot.category_total}개 → ${path.join(dataDir, "commands.json")}`,
+);
+console.log(
+  invite
+    ? `초대 주소 생성 (권한 ${permissions}) → ${path.join(dataDir, "bot.json")}`
+    : "⚠️ CLIENT_ID가 없어 초대 주소를 만들지 못했어요",
+);
 process.exit(0);

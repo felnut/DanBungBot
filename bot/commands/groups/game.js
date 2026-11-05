@@ -6,7 +6,11 @@ module.exports = makeGroup({
   name: "게임",
   description: "게임 계정 (가입·정보·출석·송금·퀘스트·도전과제·배지·랭킹)",
   entries: [
-    { name: "가입", module: g("money"), description: "게임에 가입하고 내 지갑을 확인해요" },
+    {
+      name: "가입",
+      module: g("money"),
+      description: "게임에 가입하고 내 지갑을 확인해요",
+    },
     { name: "정보", module: g("profile") },
     { name: "출석", module: g("daily") },
     { name: "송금", module: g("transfer") },

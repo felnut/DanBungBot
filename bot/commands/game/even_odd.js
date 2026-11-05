@@ -12,7 +12,9 @@ const WIN_CHANCE = 0.47; // 승률 47 : 53 → 환수율 94%
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("홀짝")
-    .setDescription("이기면 베팅액만큼 받고, 지면 베팅액을 잃습니다. (승률 47%)")
+    .setDescription(
+      "이기면 베팅액만큼 받고, 지면 베팅액을 잃습니다. (승률 47%)",
+    )
     .addStringOption((option) =>
       option
         .setName("선택")
@@ -32,7 +34,6 @@ module.exports = {
     ),
 
   async execute(interaction) {
-
     const choice = interaction.options.getString("선택"); // 사용자가 선택한 홀/짝
     const bet = interaction.options.getInteger("금액"); // 베팅 금액
 
@@ -65,7 +66,8 @@ module.exports = {
     );
 
     cache.invalidateMoney(user.user_id);
-    if (bet >= 50) require("../../managers/progress").record(user.user_id, "play");
+    if (bet >= 50)
+      require("../../managers/progress").record(user.user_id, "play");
 
     // 최종 잔액 표시
     const newBalance = newMoney;

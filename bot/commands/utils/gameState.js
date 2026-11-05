@@ -12,7 +12,9 @@ db.exec(`
 const games = new Map();
 
 // 시작 시 DB에 남아 있는 진행 중 게임 복구
-for (const row of db.prepare("SELECT user_id, state FROM baseball_games").all()) {
+for (const row of db
+  .prepare("SELECT user_id, state FROM baseball_games")
+  .all()) {
   try {
     games.set(row.user_id, JSON.parse(row.state));
   } catch {

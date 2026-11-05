@@ -15,7 +15,8 @@ const MEDALS = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣"];
 const BOARDS = {
   money: {
     title: "💰 돈 랭킹",
-    select: "SELECT u.user_id, u.money AS v1, 0 AS v2 FROM user u {JOIN} {WHERE} ORDER BY u.money DESC",
+    select:
+      "SELECT u.user_id, u.money AS v1, 0 AS v2 FROM user u {JOIN} {WHERE} ORDER BY u.money DESC",
     line: (r) => `**${r.v1.toLocaleString()}원**`,
   },
   weapon: {
@@ -43,27 +44,46 @@ function statements(kind) {
   if (!compiled[kind]) {
     const b = BOARDS[kind];
     compiled[kind] = {
-      global: db.prepare(`${b.select.replace("{JOIN}", "").replace("{WHERE}", "")} LIMIT ${TOP}`),
-      guild: db.prepare(`${b.select.replace("{JOIN}", "JOIN user_guild g ON g.user_id = u.user_id").replace("{WHERE}", "WHERE g.guild_id = ?")} LIMIT ${TOP}`),
+      global: db.prepare(
+        `${b.select.replace("{JOIN}", "").replace("{WHERE}", "")} LIMIT ${TOP}`,
+      ),
+      guild: db.prepare(
+        `${b.select.replace("{JOIN}", "JOIN user_guild g ON g.user_id = u.user_id").replace("{WHERE}", "WHERE g.guild_id = ?")} LIMIT ${TOP}`,
+      ),
     };
   }
   return compiled[kind];
 }
 
 const render = (rows, kind) =>
-  rows.length ? rows.map((r, i) => `${MEDALS[i]} <@${r.user_id}> ${BOARDS[kind].line(r)}`).join("\n") : "아직 순위에 오른 사람이 없어요.";
+  rows.length
+    ? rows
+        .map((r, i) => `${MEDALS[i]} <@${r.user_id}> ${BOARDS[kind].line(r)}`)
+        .join("\n")
+    : "아직 순위에 오른 사람이 없어요.";
 
 /** 랭킹 화면(임베드). kind: money / weapon / stock / fishing */
 async function rankingEmbed(kind, guildId) {
   const st = statements(kind);
-  const global = await cache.getOrSet(`rank5:${kind}:global`, 15000, async () => st.global.all());
-  const embed = new EmbedBuilder().setColor(0xffd700).setTitle(`🏆 ${BOARDS[kind].title} TOP ${TOP}`).setTimestamp();
+  const global = await cache.getOrSet(`rank5:${kind}:global`, 15000, async () =>
+    st.global.all(),
+  );
+  const embed = new EmbedBuilder()
+    .setColor(0xffd700)
+    .setTitle(`🏆 ${BOARDS[kind].title} TOP ${TOP}`)
+    .setTimestamp();
   embed.addFields({ name: "🌐 전체", value: render(global, kind) });
   if (GUILD_RANK_ENABLED && guildId) {
-    const guild = await cache.getOrSet(`rank5:${kind}:guild:${guildId}`, 15000, async () => st.guild.all(guildId));
+    const guild = await cache.getOrSet(
+      `rank5:${kind}:guild:${guildId}`,
+      15000,
+      async () => st.guild.all(guildId),
+    );
     embed.addFields({ name: "🏠 이 서버", value: render(guild, kind) });
   } else if (!GUILD_RANK_ENABLED) {
-    embed.setFooter({ text: "이 서버 순위는 서버별 이용 기록 기능이 켜지면 함께 보여요" });
+    embed.setFooter({
+      text: "이 서버 순위는 서버별 이용 기록 기능이 켜지면 함께 보여요",
+    });
   }
   return embed;
 }

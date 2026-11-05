@@ -23,7 +23,17 @@ const INPUT_MS = 2 * 60 * 1000; // 입력창을 연 뒤 제출까지 기다리�
  * @param opts.reveal       () => 졌을 때 공개할 정답 문구
  */
 async function runGuessGame(interaction, opts) {
-  const { title, color = 0x5865f2, intro, maxTries, inputLabel, placeholder, maxLength = 20, judge, reveal } = opts;
+  const {
+    title,
+    color = 0x5865f2,
+    intro,
+    maxTries,
+    inputLabel,
+    placeholder,
+    maxLength = 20,
+    judge,
+    reveal,
+  } = opts;
   const buttonId = `guess:${interaction.id}`;
   const modalId = `guessmodal:${interaction.id}`;
   const history = [];
@@ -34,11 +44,21 @@ async function runGuessGame(interaction, opts) {
     new EmbedBuilder()
       .setColor(color)
       .setTitle(title)
-      .setDescription([intro, history.length ? `\n${history.join("\n")}` : "", note ? `\n${note}` : ""].join(""))
+      .setDescription(
+        [
+          intro,
+          history.length ? `\n${history.join("\n")}` : "",
+          note ? `\n${note}` : "",
+        ].join(""),
+      )
       .setFooter({ text: footer ?? `남은 기회 ${maxTries - tries}번` });
   const button = (disabled = false) =>
     new ActionRowBuilder().addComponents(
-      new ButtonBuilder().setCustomId(buttonId).setLabel("답 입력하기").setStyle(ButtonStyle.Primary).setDisabled(disabled),
+      new ButtonBuilder()
+        .setCustomId(buttonId)
+        .setLabel("답 입력하기")
+        .setStyle(ButtonStyle.Primary)
+        .setDisabled(disabled),
     );
 
   await interaction.reply({ embeds: [view()], components: [button()] });
@@ -71,7 +91,12 @@ async function runGuessGame(interaction, opts) {
             ),
           ),
       );
-      const sub = await i.awaitModalSubmit({ time: INPUT_MS, filter: (m) => m.customId === modalId && m.user.id === i.user.id }).catch(() => null);
+      const sub = await i
+        .awaitModalSubmit({
+          time: INPUT_MS,
+          filter: (m) => m.customId === modalId && m.user.id === i.user.id,
+        })
+        .catch(() => null);
       if (!sub) return;
 
       const input = sub.fields.getTextInputValue("answer").trim();
@@ -86,8 +111,17 @@ async function runGuessGame(interaction, opts) {
       if (result.correct || tries >= maxTries) {
         finished = true;
         const won = Boolean(result.correct);
-        note = won ? `🎉 **정답!** ${tries}번 만에 맞혔어요!` : `😢 기회를 모두 썼어요. 정답은 **${reveal()}** 였어요.`;
-        await sub.update({ embeds: [view(won ? "게임 끝 · 다시 하려면 명령어를 또 쓰세요" : "게임 끝").setColor(won ? 0x57f287 : 0xed4245)], components: [button(true)] });
+        note = won
+          ? `🎉 **정답!** ${tries}번 만에 맞혔어요!`
+          : `😢 기회를 모두 썼어요. 정답은 **${reveal()}** 였어요.`;
+        await sub.update({
+          embeds: [
+            view(
+              won ? "게임 끝 · 다시 하려면 명령어를 또 쓰세요" : "게임 끝",
+            ).setColor(won ? 0x57f287 : 0xed4245),
+          ],
+          components: [button(true)],
+        });
         collector.stop("done");
         return;
       }
@@ -102,7 +136,9 @@ async function runGuessGame(interaction, opts) {
   collector.on("end", async () => {
     if (finished) return;
     note = `⌛ 시간이 지나서 끝났어요. 정답은 **${reveal()}** 였어요.`;
-    await interaction.editReply({ embeds: [view("게임 끝")], components: [button(true)] }).catch(() => {});
+    await interaction
+      .editReply({ embeds: [view("게임 끝")], components: [button(true)] })
+      .catch(() => {});
   });
 }
 

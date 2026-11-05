@@ -71,7 +71,9 @@ db.exec(`
 // 랭킹/순위 계산: ORDER BY / WHERE money > ? 최적화
 db.exec(`CREATE INDEX IF NOT EXISTS idx_user_money ON user(money);`);
 // 최근 뉴스 1건 조회 최적화
-db.exec(`CREATE INDEX IF NOT EXISTS idx_stocks_last_news_time ON stocks(last_news_time);`);
+db.exec(
+  `CREATE INDEX IF NOT EXISTS idx_stocks_last_news_time ON stocks(last_news_time);`,
+);
 
 // ================== 스키마 자동 마이그레이션 ==================
 console.log("🔧 스키마 자동 마이그레이션 체크 중...");
@@ -173,7 +175,9 @@ db.exec(`
     last_day TEXT
   )
 `);
-db.prepare("INSERT OR IGNORE INTO market_state (id, vol_mult, last_day) VALUES (1, 1, NULL)").run();
+db.prepare(
+  "INSERT OR IGNORE INTO market_state (id, vol_mult, last_day) VALUES (1, 1, NULL)",
+).run();
 // 주식 시장 1회성 초기화(개편) 완료 여부와, 아직 전송하지 못한 공지(JSON)
 ensureColumn("market_state", "stock_reset_done INTEGER DEFAULT 0");
 ensureColumn("market_state", "reset_notice TEXT DEFAULT NULL"); // 더 이상 사용하지 않음(자동 공지 제거)
@@ -192,7 +196,9 @@ db.exec(`
 
 // 마지막 이용 시각(ms) — 12개월 미이용 계정 삭제 기준 (개인정보 처리방침 1항)
 ensureColumn("user", "last_active INTEGER DEFAULT 0");
-db.prepare("UPDATE user SET last_active = ? WHERE last_active = 0").run(Date.now());
+db.prepare("UPDATE user SET last_active = ? WHERE last_active = 0").run(
+  Date.now(),
+);
 
 // 송금 기록 — 일일 송금 한도 계산용 (송금 후 7일이 지난 기록은 정리)
 db.exec(`
@@ -203,7 +209,9 @@ db.exec(`
     created_at INTEGER NOT NULL
   )
 `);
-db.exec("CREATE INDEX IF NOT EXISTS idx_transfer_sender ON transfer_log(sender_id, created_at);");
+db.exec(
+  "CREATE INDEX IF NOT EXISTS idx_transfer_sender ON transfer_log(sender_id, created_at);",
+);
 
 // 서버 D-day (/디데이) — 이름·날짜·만든 사람. 날짜가 30일 지나면 정기 정리에서 삭제
 db.exec(`
@@ -216,7 +224,9 @@ db.exec(`
     created_at INTEGER NOT NULL
   )
 `);
-db.exec("CREATE INDEX IF NOT EXISTS idx_dday_guild_date ON dday(guild_id, date);");
+db.exec(
+  "CREATE INDEX IF NOT EXISTS idx_dday_guild_date ON dday(guild_id, date);",
+);
 
 // DM 전용 명령어 — 알림(/알림): 시각이 되면 DM으로 보내고 바로 삭제 / 메모(/메모): 본인이 지울 때까지 보관
 db.exec(`
@@ -249,7 +259,12 @@ db.exec(`
 `);
 
 // 서버별 등록 학교 (/학교등록) — 시간표·학사일정·급식 조회에 사용. 서버마다 여러 학교를 등록할 수 있다
-const tableExists = (name) => Boolean(db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?").get(name));
+const tableExists = (name) =>
+  Boolean(
+    db
+      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
+      .get(name),
+  );
 const schoolsTableIsNew = !tableExists("guild_schools");
 db.exec(`
   CREATE TABLE IF NOT EXISTS guild_schools (
@@ -289,13 +304,14 @@ db.exec(`
     PRIMARY KEY (guild_id, user_id)
   )
 `);
-db.exec("CREATE INDEX IF NOT EXISTS idx_user_guild_user ON user_guild(user_id);");
+db.exec(
+  "CREATE INDEX IF NOT EXISTS idx_user_guild_user ON user_guild(user_id);",
+);
 // 이전 버전에는 서버 구분이 없었으므로, 기존 이용자는 운영 서버(GUILD_ID)에서 이용한 것으로 한 번 등록한다
 if (process.env.GUILD_ID && process.env.GUILD_RANK_ENABLED === "1") {
-  db.prepare("INSERT OR IGNORE INTO user_guild (guild_id, user_id, last_seen) SELECT ?, user_id, ? FROM user").run(
-    process.env.GUILD_ID,
-    Date.now(),
-  );
+  db.prepare(
+    "INSERT OR IGNORE INTO user_guild (guild_id, user_id, last_seen) SELECT ?, user_id, ? FROM user",
+  ).run(process.env.GUILD_ID, Date.now());
 }
 
 // 음악 추천 설정 (/음악추천) — 서버 단위 설정만 저장하고 사용자 정보는 저장하지 않는다
@@ -346,10 +362,19 @@ db.exec(`
 `);
 // 낚시 도감은 어종 이름(이모지 포함) 대신 어종 키로 저장한다 — 기존 기록(이름)은 아래에서 한 번 옮긴다
 const FISH_NAME_TO_KEY = {
-  "👢 낡은 장화": "boot", "🐟 붕어": "crucian", "🐠 잉어": "carp", "🐡 농어": "bass", "🍣 연어": "salmon", "🦈 참치": "tuna", "👑 황금물고기": "gold",
+  "👢 낡은 장화": "boot",
+  "🐟 붕어": "crucian",
+  "🐠 잉어": "carp",
+  "🐡 농어": "bass",
+  "🍣 연어": "salmon",
+  "🦈 참치": "tuna",
+  "👑 황금물고기": "gold",
 };
 for (const [name, key] of Object.entries(FISH_NAME_TO_KEY)) {
-  db.prepare("UPDATE OR IGNORE fish_log SET fish = ? WHERE fish = ?").run(key, name);
+  db.prepare("UPDATE OR IGNORE fish_log SET fish = ? WHERE fish = ?").run(
+    key,
+    name,
+  );
 }
 
 // 낚시 최고 기록 (/낚시 시작 결과 화면, /낚시 도감) — 어종별 내 가장 큰 크기. 사용자 삭제 시 함께 삭제
@@ -384,7 +409,9 @@ db.exec(`
     UNIQUE (user_id, name)
   )
 `);
-db.exec("CREATE INDEX IF NOT EXISTS idx_weapons_level ON weapons(level DESC, best_level DESC);");
+db.exec(
+  "CREATE INDEX IF NOT EXISTS idx_weapons_level ON weapons(level DESC, best_level DESC);",
+);
 ensureColumn("weapons", "exp INTEGER NOT NULL DEFAULT 0"); // 지금 단계에서 쌓은 경험치 (그 단계의 필요량을 넘으면 다음 단계)
 // 이전 버전(사용자당 무기 1개, 이름이 없을 수 있음)의 weapon 테이블이 있으면 한 번 옮기고 지운다
 if (tableExists("weapon")) {
@@ -472,7 +499,10 @@ const runSymbolMigrations = db.transaction(() => {
     if (toRow) continue;
 
     db.prepare("UPDATE stocks SET symbol = ? WHERE symbol = ?").run(to, from);
-    db.prepare("UPDATE user_stocks SET symbol = ? WHERE symbol = ?").run(to, from);
+    db.prepare("UPDATE user_stocks SET symbol = ? WHERE symbol = ?").run(
+      to,
+      from,
+    );
 
     console.log(`✅ stocks/user_stocks 심볼 마이그레이션: ${from} → ${to}`);
   }

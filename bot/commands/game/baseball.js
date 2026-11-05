@@ -123,7 +123,9 @@ module.exports = {
             new EmbedBuilder()
               .setColor("#ff4444")
               .setTitle("❔ 진행 중인 게임이 없어요")
-              .setDescription("`/도박 숫자야구 시작`으로 먼저 게임을 시작해주세요!"),
+              .setDescription(
+                "`/도박 숫자야구 시작`으로 먼저 게임을 시작해주세요!",
+              ),
           ],
           flags: MessageFlags.Ephemeral,
         });

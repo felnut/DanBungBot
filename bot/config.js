@@ -3,7 +3,9 @@
 module.exports = {
   // 공식 웹사이트 주소. 이용약관·개인정보 처리방침 링크(이메일 등록 동의 안내, 도움말 버튼)에 쓴다.
   // 사이트를 다른 주소로 게시하면 .env의 SITE_URL만 바꾸면 된다 (끝의 /는 없어도 된다)
-  SITE_URL: (process.env.SITE_URL || "https://felnut.github.io/OMNI-Bot").replace(/\/+$/, ""),
+  SITE_URL: (
+    process.env.SITE_URL || "https://felnut.github.io/OMNI-Bot"
+  ).replace(/\/+$/, ""),
 
   // 아래는 기능 스위치 (기본값은 꺼짐)
   // 서버별 이용 기록(user_guild) 저장과 '현재 서버' 랭킹.

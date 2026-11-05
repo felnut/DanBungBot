@@ -1,4 +1,8 @@
-const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  EmbedBuilder,
+  MessageFlags,
+} = require("discord.js");
 const {
   buyStock,
   sellStock,
@@ -9,7 +13,7 @@ const {
   createChartEmbed,
   createRealizedEmbed,
   getStocksForAutocomplete,
-} =require("../../managers/stockManager");
+} = require("../../managers/stockManager");
 const db = require("../../../Database");
 const { rankingEmbed } = require("../../managers/rankings");
 const cache = require("../utils/cache");
@@ -68,20 +72,31 @@ module.exports = {
       sub.setName("수익").setDescription("매도로 확정한 누적 손익 확인"),
     )
     .addSubcommand((sub) =>
-      sub.setName("랭킹").setDescription("주식 보유액 순위 (전체 + 이 서버 TOP 5)"),
+      sub
+        .setName("랭킹")
+        .setDescription("주식 보유액 순위 (전체 + 이 서버 TOP 5)"),
     )
     .addSubcommand((sub) =>
       sub
         .setName("뉴스")
         .setDescription("종목 뉴스 보기")
-        .addStringOption((opt) => opt.setName("종목").setDescription("비워 두면 전체").setAutocomplete(true)),
+        .addStringOption((opt) =>
+          opt
+            .setName("종목")
+            .setDescription("비워 두면 전체")
+            .setAutocomplete(true),
+        ),
     )
     .addSubcommand((sub) =>
       sub
         .setName("차트")
         .setDescription("종목 차트 보기")
         .addStringOption((opt) =>
-          opt.setName("종목").setDescription("종목명 (입력 시 목록이 뜹니다)").setRequired(true).setAutocomplete(true),
+          opt
+            .setName("종목")
+            .setDescription("종목명 (입력 시 목록이 뜹니다)")
+            .setRequired(true)
+            .setAutocomplete(true),
         ),
     ),
 
@@ -108,7 +123,11 @@ module.exports = {
 
         cache.invalidateMoney(interaction.user.id);
         // 수수료가 없어 사고팔기가 공짜이므로, 일정 금액 이상의 거래만 퀘스트로 세고 하루 횟수도 제한한다 (progress.js)
-        if (value >= STOCK_PROGRESS_MIN) require("../../managers/progress").record(interaction.user.id, "stock");
+        if (value >= STOCK_PROGRESS_MIN)
+          require("../../managers/progress").record(
+            interaction.user.id,
+            "stock",
+          );
 
         const portfolioEmbed = createMyStocksEmbed(
           interaction.user.id,
@@ -125,26 +144,44 @@ module.exports = {
     }
     // ====================== 내 주식 ======================
     if (sub === "내주식") {
-      const embed = createMyStocksEmbed(interaction.user.id, interaction.user.username);
+      const embed = createMyStocksEmbed(
+        interaction.user.id,
+        interaction.user.username,
+      );
       return interaction.reply({ embeds: [embed] });
     }
     if (sub === "수익") {
-      return interaction.reply({ embeds: [createRealizedEmbed(interaction.user.id, interaction.user.username)] });
+      return interaction.reply({
+        embeds: [
+          createRealizedEmbed(interaction.user.id, interaction.user.username),
+        ],
+      });
     }
     // ====================== 랭킹 ======================
     if (sub === "랭킹") {
-      return interaction.reply({ embeds: [await rankingEmbed("stock", interaction.guildId)], allowedMentions: { parse: [] } });
+      return interaction.reply({
+        embeds: [await rankingEmbed("stock", interaction.guildId)],
+        allowedMentions: { parse: [] },
+      });
     }
 
     // ====================== 뉴스 / 손익 / 차트 ======================
     if (sub === "뉴스") {
       const symbol = interaction.options.getString("종목");
-      if (symbol && !STOCKS[symbol]) return interaction.reply({ content: "❌ 존재하지 않는 종목입니다.", flags: MessageFlags.Ephemeral });
+      if (symbol && !STOCKS[symbol])
+        return interaction.reply({
+          content: "❌ 존재하지 않는 종목입니다.",
+          flags: MessageFlags.Ephemeral,
+        });
       return interaction.reply({ embeds: [createStockNewsEmbed(symbol)] });
     }
     if (sub === "차트") {
       const embed = createChartEmbed(interaction.options.getString("종목"));
-      if (!embed) return interaction.reply({ content: "❌ 존재하지 않는 종목입니다.", flags: MessageFlags.Ephemeral });
+      if (!embed)
+        return interaction.reply({
+          content: "❌ 존재하지 않는 종목입니다.",
+          flags: MessageFlags.Ephemeral,
+        });
       return interaction.reply({ embeds: [embed] });
     }
   },

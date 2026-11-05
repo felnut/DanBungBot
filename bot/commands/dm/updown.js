@@ -20,10 +20,21 @@ module.exports = {
       placeholder: "예: 50",
       maxLength: 3,
       judge(input) {
-        if (!/^\d{1,3}$/.test(input) || Number(input) < 1 || Number(input) > 100) return { invalid: "1부터 100 사이의 숫자를 넣어 주세요. (기회는 줄지 않아요)" };
+        if (
+          !/^\d{1,3}$/.test(input) ||
+          Number(input) < 1 ||
+          Number(input) > 100
+        )
+          return {
+            invalid:
+              "1부터 100 사이의 숫자를 넣어 주세요. (기회는 줄지 않아요)",
+          };
         const n = Number(input);
         if (n === answer) return { correct: true, text: "🎯 정답!" };
-        return { correct: false, text: n < answer ? "🔼 더 커요 (UP)" : "🔽 더 작아요 (DOWN)" };
+        return {
+          correct: false,
+          text: n < answer ? "🔼 더 커요 (UP)" : "🔽 더 작아요 (DOWN)",
+        };
       },
       reveal: () => String(answer),
     });

@@ -1,4 +1,8 @@
-const { SlashCommandBuilder, PermissionFlagsBits, MessageFlags } = require("discord.js");
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  MessageFlags,
+} = require("discord.js");
 const db = require("../../../Database.js");
 const cache = require("../utils/cache");
 
@@ -12,7 +16,7 @@ module.exports = {
     .setDescription("[관리자 전용] 특정 유저의 돈을 강제로 설정합니다")
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator) // 관리자에게만 보임 (실행은 OWNER_ID만 가능)
     .addUserOption((option) =>
-      option.setName("유저").setDescription("대상 유저").setRequired(true), 
+      option.setName("유저").setDescription("대상 유저").setRequired(true),
     )
     .addIntegerOption((option) =>
       option

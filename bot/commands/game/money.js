@@ -12,7 +12,6 @@ module.exports = {
     .setDescription("현재 보유 금액을 확인합니다 💰"),
 
   async execute(interaction) {
-
     // 유저 정보 불러오기
     let user = db
       .prepare("SELECT * FROM user WHERE user_id = ?")

@@ -9,15 +9,23 @@ const { spawn, execFile } = require("node:child_process");
 const ROOT = path.join(__dirname, "../..");
 const VENV_PY =
   process.env.YTDLP_PYTHON ||
-  path.join(ROOT, "music/tools/ytdlp-venv", process.platform === "win32" ? "Scripts/python.exe" : "bin/python");
+  path.join(
+    ROOT,
+    "music/tools/ytdlp-venv",
+    process.platform === "win32" ? "Scripts/python.exe" : "bin/python",
+  );
 const WORKER_SCRIPT = path.join(ROOT, "music/ytdlp_worker.py");
 const EXE = process.env.YTDLP_PATH || "yt-dlp";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const UPDATE_TIMEOUT_MS = 180_000;
-const FIELDS = "%(.{id,title,uploader,thumbnail,webpage_url,url,duration,is_live})j";
+const FIELDS =
+  "%(.{id,title,uploader,thumbnail,webpage_url,url,duration,is_live})j";
 
-const useWorker = process.env.YTDLP_USE_WORKER !== "0" && fs.existsSync(VENV_PY) && fs.existsSync(WORKER_SCRIPT);
+const useWorker =
+  process.env.YTDLP_USE_WORKER !== "0" &&
+  fs.existsSync(VENV_PY) &&
+  fs.existsSync(WORKER_SCRIPT);
 
 let child = null;
 let readyPromise = null;
@@ -53,12 +61,18 @@ function onLine(line) {
 function ensureWorker() {
   if (child && readyPromise) return readyPromise;
   buffer = "";
-  const proc = spawn(VENV_PY, [WORKER_SCRIPT], { stdio: ["pipe", "pipe", "pipe"], windowsHide: true });
+  const proc = spawn(VENV_PY, [WORKER_SCRIPT], {
+    stdio: ["pipe", "pipe", "pipe"],
+    windowsHide: true,
+  });
   child = proc;
   proc.stdout.setEncoding("utf8");
   proc.stderr.setEncoding("utf8");
   readyPromise = new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error("워커 시작 시간 초과")), 20_000);
+    const timer = setTimeout(
+      () => reject(new Error("워커 시작 시간 초과")),
+      20_000,
+    );
     proc.stdout.on("data", (chunk) => {
       buffer += chunk;
       let i;
@@ -68,7 +82,9 @@ function ensureWorker() {
         if (line.includes('"ready"')) {
           clearTimeout(timer);
           try {
-            console.log(`🎵 yt-dlp 워커 준비 완료 (v${JSON.parse(line).version})`);
+            console.log(
+              `🎵 yt-dlp 워커 준비 완료 (v${JSON.parse(line).version})`,
+            );
           } catch {
             /* 버전 출력 실패는 무시 */
           }
@@ -81,7 +97,9 @@ function ensureWorker() {
     proc.once("exit", () => reject(new Error("워커가 시작 중 종료됨")));
   });
   readyPromise.catch(() => {});
-  proc.stderr.on("data", (d) => console.error("🎵 yt-dlp 워커 stderr:", d.toString().trim().slice(0, 300)));
+  proc.stderr.on("data", (d) =>
+    console.error("🎵 yt-dlp 워커 stderr:", d.toString().trim().slice(0, 300)),
+  );
   proc.on("exit", (code) => {
     if (child === proc) {
       child = null;
@@ -124,7 +142,10 @@ function searchViaWorker(query, count) {
           reject(new Error("yt-dlp 검색 시간 초과"));
         }, REQUEST_TIMEOUT_MS);
         pending.set(id, { resolve, reject, timer });
-        child.stdin.write(JSON.stringify({ id, op: "search", query, count }) + String.fromCharCode(10));
+        child.stdin.write(
+          JSON.stringify({ id, op: "search", query, count }) +
+            String.fromCharCode(10),
+        );
       }),
   );
 }
@@ -133,8 +154,18 @@ function searchViaExe(query, count) {
   return new Promise((resolve, reject) => {
     execFile(
       EXE,
-      ["--flat-playlist", "--no-warnings", "--print", "%(.{id,title,uploader,channel,duration,live_status})j", `ytsearch${count + 5}:${query}`],
-      { timeout: REQUEST_TIMEOUT_MS, windowsHide: true, maxBuffer: 5 * 1024 * 1024 },
+      [
+        "--flat-playlist",
+        "--no-warnings",
+        "--print",
+        "%(.{id,title,uploader,channel,duration,live_status})j",
+        `ytsearch${count + 5}:${query}`,
+      ],
+      {
+        timeout: REQUEST_TIMEOUT_MS,
+        windowsHide: true,
+        maxBuffer: 5 * 1024 * 1024,
+      },
       (err, stdout, stderr) => {
         if (err) return reject(new Error((stderr || err.message).toString()));
         const out = [];
@@ -142,7 +173,13 @@ function searchViaExe(query, count) {
           try {
             const e = JSON.parse(line);
             if (e.id && e.id.length === 11 && e.live_status !== "is_upcoming") {
-              out.push({ id: e.id, title: e.title, uploader: e.channel || e.uploader, duration: e.duration, is_live: e.live_status === "is_live" });
+              out.push({
+                id: e.id,
+                title: e.title,
+                uploader: e.channel || e.uploader,
+                duration: e.duration,
+                is_live: e.live_status === "is_live",
+              });
             }
           } catch {
             /* 빈 줄 등 무시 */
@@ -159,8 +196,22 @@ function extractViaExe(target) {
   return new Promise((resolve, reject) => {
     execFile(
       EXE,
-      ["--no-playlist", "--no-warnings", "-f", "bestaudio", "--js-runtimes", "node", "--print", FIELDS, target],
-      { timeout: REQUEST_TIMEOUT_MS, windowsHide: true, maxBuffer: 5 * 1024 * 1024 },
+      [
+        "--no-playlist",
+        "--no-warnings",
+        "-f",
+        "bestaudio",
+        "--js-runtimes",
+        "node",
+        "--print",
+        FIELDS,
+        target,
+      ],
+      {
+        timeout: REQUEST_TIMEOUT_MS,
+        windowsHide: true,
+        maxBuffer: 5 * 1024 * 1024,
+      },
       (err, stdout, stderr) => {
         if (err) return reject(new Error((stderr || err.message).toString()));
         try {
@@ -202,20 +253,29 @@ function search(query, count = 5) {
   // 12분을 넘는 영상(모음·믹스·풀 앨범)은 곡 단위 영상 뒤로 미룬다. 곡이 부족하면 그대로 포함된다.
   // 거르고도 count개가 남도록 여유 있게 가져온다.
   const pool = Math.min(count * 2, 10);
-  const fetchPool = useWorker ? searchViaWorker(query, pool) : searchViaExe(query, pool);
+  const fetchPool = useWorker
+    ? searchViaWorker(query, pool)
+    : searchViaExe(query, pool);
   const promise = fetchPool.then((all) => {
-    const isLong = (r) => !r.is_live && r.duration && r.duration > LONG_VIDEO_SEC;
-    return [...all.filter((r) => !isLong(r)), ...all.filter(isLong)].slice(0, count);
+    const isLong = (r) =>
+      !r.is_live && r.duration && r.duration > LONG_VIDEO_SEC;
+    return [...all.filter((r) => !isLong(r)), ...all.filter(isLong)].slice(
+      0,
+      count,
+    );
   });
   searchMemo.set(key, { t: Date.now(), promise });
   promise.catch(() => searchMemo.delete(key));
-  if (searchMemo.size > MEMO_MAX) searchMemo.delete(searchMemo.keys().next().value);
+  if (searchMemo.size > MEMO_MAX)
+    searchMemo.delete(searchMemo.keys().next().value);
   return promise;
 }
 
 /** 영상 파일 다운로드 등 CLI로 실행할 때의 [실행파일, 앞쪽 인자] */
 function command() {
-  return useWorker ? { file: VENV_PY, prefix: ["-m", "yt_dlp"] } : { file: EXE, prefix: [] };
+  return useWorker
+    ? { file: VENV_PY, prefix: ["-m", "yt_dlp"] }
+    : { file: EXE, prefix: [] };
 }
 
 const PLAYLIST_TIMEOUT_MS = 45_000;
@@ -229,18 +289,46 @@ function playlistEntries(url, limit = 100) {
   return new Promise((resolve, reject) => {
     execFile(
       file,
-      [...prefix, "--flat-playlist", "--no-warnings", "--playlist-end", String(limit), "--print", "%(.{id,title,uploader,channel,url,webpage_url,duration,live_status})j", url],
-      { timeout: PLAYLIST_TIMEOUT_MS, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+      [
+        ...prefix,
+        "--flat-playlist",
+        "--no-warnings",
+        "--playlist-end",
+        String(limit),
+        "--print",
+        "%(.{id,title,uploader,channel,url,webpage_url,duration,live_status})j",
+        url,
+      ],
+      {
+        timeout: PLAYLIST_TIMEOUT_MS,
+        windowsHide: true,
+        maxBuffer: 8 * 1024 * 1024,
+      },
       (err, stdout, stderr) => {
-        if (err) return reject(new Error((stderr || err.message).toString().slice(0, 300)));
+        if (err)
+          return reject(
+            new Error((stderr || err.message).toString().slice(0, 300)),
+          );
         const out = [];
         for (const line of stdout.split(/\r?\n/)) {
           if (!line.trim()) continue;
           try {
             const e = JSON.parse(line);
-            if (!e.id || !e.title || /^\[(Private|Deleted) video\]$/i.test(e.title)) continue;
-            if (e.live_status === "is_live" || e.live_status === "is_upcoming") continue;
-            out.push({ id: e.id, title: e.title, uploader: e.channel || e.uploader || "", url: e.webpage_url || e.url || "", duration: e.duration });
+            if (
+              !e.id ||
+              !e.title ||
+              /^\[(Private|Deleted) video\]$/i.test(e.title)
+            )
+              continue;
+            if (e.live_status === "is_live" || e.live_status === "is_upcoming")
+              continue;
+            out.push({
+              id: e.id,
+              title: e.title,
+              uploader: e.channel || e.uploader || "",
+              url: e.webpage_url || e.url || "",
+              duration: e.duration,
+            });
           } catch {
             /* 빈 줄 등 무시 */
           }
@@ -254,28 +342,55 @@ function playlistEntries(url, limit = 100) {
 /** yt-dlp를 최신 버전으로 업데이트. 성공하면 true */
 function update() {
   return new Promise((resolve) => {
-    const [file, args] = useWorker ? [VENV_PY, ["-m", "pip", "install", "-U", "-q", "yt-dlp"]] : [EXE, ["-U"]];
-    execFile(file, args, { timeout: UPDATE_TIMEOUT_MS, windowsHide: true }, (err, stdout, stderr) => {
-      if (err) {
-        console.error("🎵 yt-dlp 업데이트 실패:", (stderr || err.message).toString().slice(0, 300));
-        return resolve(false);
-      }
-      console.log("🎵 yt-dlp 업데이트 완료", useWorker ? "(워커를 재시작합니다)" : stdout.toString().trim().split("\n").slice(-1)[0]);
-      stopWorker(); // 새 버전으로 다시 뜨도록 다음 요청 때 재시작
-      resolve(true);
-    });
+    const [file, args] = useWorker
+      ? [VENV_PY, ["-m", "pip", "install", "-U", "-q", "yt-dlp"]]
+      : [EXE, ["-U"]];
+    execFile(
+      file,
+      args,
+      { timeout: UPDATE_TIMEOUT_MS, windowsHide: true },
+      (err, stdout, stderr) => {
+        if (err) {
+          console.error(
+            "🎵 yt-dlp 업데이트 실패:",
+            (stderr || err.message).toString().slice(0, 300),
+          );
+          return resolve(false);
+        }
+        console.log(
+          "🎵 yt-dlp 업데이트 완료",
+          useWorker
+            ? "(워커를 재시작합니다)"
+            : stdout.toString().trim().split("\n").slice(-1)[0],
+        );
+        stopWorker(); // 새 버전으로 다시 뜨도록 다음 요청 때 재시작
+        resolve(true);
+      },
+    );
   });
 }
 
 /** 봇 시작 시 워커를 미리 띄워 첫 요청 지연을 없앤다 */
 function warmup() {
   if (!useWorker) {
-    console.log("🎵 yt-dlp 워커 없음 → 실행 파일 방식 사용 (느림). music/tools/ytdlp-venv 설치를 권장합니다.");
+    console.log(
+      "🎵 yt-dlp 워커 없음 → 실행 파일 방식 사용 (느림). music/tools/ytdlp-venv 설치를 권장합니다.",
+    );
     return;
   }
-  ensureWorker().catch((e) => console.error("🎵 yt-dlp 워커 시작 실패:", e.message));
+  ensureWorker().catch((e) =>
+    console.error("🎵 yt-dlp 워커 시작 실패:", e.message),
+  );
 }
 
 process.on("exit", () => child?.kill());
 
-module.exports = { extract, search, playlistEntries, command, update, warmup, useWorker };
+module.exports = {
+  extract,
+  search,
+  playlistEntries,
+  command,
+  update,
+  warmup,
+  useWorker,
+};

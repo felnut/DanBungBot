@@ -1,5 +1,10 @@
 const { SlashCommandBuilder } = require("discord.js");
-const { MIN_BET, TOTAL, pickWeighted, play } = require("../../managers/instantGame");
+const {
+  MIN_BET,
+  TOTAL,
+  pickWeighted,
+  play,
+} = require("../../managers/instantGame");
 
 // 이김 32% · 비김 30% · 짐 38% → 환수율 (0.32×2 + 0.30×1) = 94%
 const OUTCOMES = [
@@ -19,9 +24,19 @@ module.exports = {
         .setName("선택")
         .setDescription("무엇을 낼까요?")
         .setRequired(true)
-        .addChoices({ name: "✌️ 가위", value: "scissors" }, { name: "✊ 바위", value: "rock" }, { name: "✋ 보", value: "paper" }),
+        .addChoices(
+          { name: "✌️ 가위", value: "scissors" },
+          { name: "✊ 바위", value: "rock" },
+          { name: "✋ 보", value: "paper" },
+        ),
     )
-    .addIntegerOption((o) => o.setName("금액").setDescription("베팅할 금액").setRequired(true).setMinValue(MIN_BET)),
+    .addIntegerOption((o) =>
+      o
+        .setName("금액")
+        .setDescription("베팅할 금액")
+        .setRequired(true)
+        .setMinValue(MIN_BET),
+    ),
 
   async execute(interaction) {
     const mine = interaction.options.getString("선택");
@@ -32,11 +47,21 @@ module.exports = {
       () => {
         const out = pickWeighted(OUTCOMES);
         // 결과에 맞는 봇의 손을 고른다
-        const bot = out.key === "draw" ? mine : out.key === "win" ? BEATS[mine] : Object.keys(BEATS).find((h) => BEATS[h] === mine);
+        const bot =
+          out.key === "draw"
+            ? mine
+            : out.key === "win"
+              ? BEATS[mine]
+              : Object.keys(BEATS).find((h) => BEATS[h] === mine);
         return { ...out, bot };
       },
       (o) => ({
-        title: o.key === "win" ? "🎉 이겼어요!" : o.key === "draw" ? "🤝 비겼어요" : "😢 졌어요...",
+        title:
+          o.key === "win"
+            ? "🎉 이겼어요!"
+            : o.key === "draw"
+              ? "🤝 비겼어요"
+              : "😢 졌어요...",
         description: `👤 나 **${HANDS[mine]}**\n🤖 봇 **${HANDS[o.bot]}**`,
       }),
     );

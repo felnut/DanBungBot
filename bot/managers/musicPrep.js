@@ -17,7 +17,8 @@ let prefetchActive = 0;
 const SUGGEST_COUNT = 5;
 
 const isUrl = (s) => /^https?:\/\//i.test(s);
-const failed = (res) => res.loadType === "error" || res.loadType === "empty" || !res.tracks.length;
+const failed = (res) =>
+  res.loadType === "error" || res.loadType === "empty" || !res.tracks.length;
 
 /** Lavalink에 곡을 로드한다 (결과 메모). 요청자별로 트랙 객체를 복제해 돌려준다 */
 async function loadTracks(identifier, requester) {
@@ -28,7 +29,9 @@ async function loadTracks(identifier, requester) {
     const node = manager?.nodeManager.leastUsedNodes()[0];
     if (!node) throw new Error("NO_NODE");
     // 링크는 그대로, 검색어는 사운드클라우드에서 찾는다
-    const query = isUrl(identifier) ? { query: identifier } : { query: identifier, source: "soundcloud" };
+    const query = isUrl(identifier)
+      ? { query: identifier }
+      : { query: identifier, source: "soundcloud" };
     const promise = node.search(query, null);
     entry = { t: Date.now(), promise };
     trackMemo.set(key, entry);
@@ -38,7 +41,8 @@ async function loadTracks(identifier, requester) {
       },
       () => trackMemo.delete(key),
     );
-    if (trackMemo.size > TRACK_MEMO_MAX) trackMemo.delete(trackMemo.keys().next().value);
+    if (trackMemo.size > TRACK_MEMO_MAX)
+      trackMemo.delete(trackMemo.keys().next().value);
   }
   const res = await entry.promise;
   return {
@@ -55,7 +59,12 @@ async function loadTracks(identifier, requester) {
  * 입력(검색어/링크)을 재생 가능한 Lavalink 트랙으로 준비한다.
  * @returns {Promise<{res: object, resolved: object}>} res: Lavalink 검색 결과, resolved: 해석 결과
  */
-async function prepareTrack(query, source, requester, { prefetch = false } = {}) {
+async function prepareTrack(
+  query,
+  source,
+  requester,
+  { prefetch = false } = {},
+) {
   let resolved = await resolveInput(query, source, { prefetch });
   let res = await loadTracks(resolved.identifier, requester);
 
@@ -80,8 +89,14 @@ const fmtDuration = (sec) => {
 
 /** 선택지 한 줄: "[3:55] 제목 · 채널" (디스코드 선택지 이름은 100자 이하) */
 function choiceName(title, author, durationSec, isLive) {
-  const tag = isLive ? "🔴 LIVE" : durationSec ? `[${fmtDuration(durationSec)}]` : "";
-  const text = [tag, title || "(제목 없음)"].filter(Boolean).join(" ") + (author ? ` · ${author}` : "");
+  const tag = isLive
+    ? "🔴 LIVE"
+    : durationSec
+      ? `[${fmtDuration(durationSec)}]`
+      : "";
+  const text =
+    [tag, title || "(제목 없음)"].filter(Boolean).join(" ") +
+    (author ? ` · ${author}` : "");
   return text.length > 100 ? text.slice(0, 99) + "…" : text;
 }
 
@@ -104,9 +119,17 @@ async function suggest(query, source) {
   const res = await node.search({ query, source: "soundcloud" }, null);
   if (failed(res)) return [];
   return res.tracks.slice(0, SUGGEST_COUNT).map((t) => ({
-    name: choiceName(t.info.title, t.info.author, t.info.duration / 1000, t.info.isStream),
+    name: choiceName(
+      t.info.title,
+      t.info.author,
+      t.info.duration / 1000,
+      t.info.isStream,
+    ),
     // 선택지 값은 100자 이하만 가능: 링크가 길면 제목으로 대신 검색하게 한다
-    value: t.info.uri && t.info.uri.length <= 100 ? t.info.uri : `${t.info.title}`.slice(0, 100),
+    value:
+      t.info.uri && t.info.uri.length <= 100
+        ? t.info.uri
+        : `${t.info.title}`.slice(0, 100),
   }));
 }
 
@@ -121,7 +144,13 @@ function isPrefetchable(text) {
     return false;
   }
   const host = url.hostname.toLowerCase();
-  const isYoutube = ["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"].includes(host);
+  const isYoutube = [
+    "youtube.com",
+    "www.youtube.com",
+    "m.youtube.com",
+    "music.youtube.com",
+    "youtu.be",
+  ].includes(host);
   return isYoutube ? Boolean(musicCache.extractVideoId(url)) : true;
 }
 
@@ -152,4 +181,10 @@ function schedulePrefetch(userId, text, source) {
   );
 }
 
-module.exports = { prepareTrack, schedulePrefetch, prefetchNow, suggest, failed };
+module.exports = {
+  prepareTrack,
+  schedulePrefetch,
+  prefetchNow,
+  suggest,
+  failed,
+};

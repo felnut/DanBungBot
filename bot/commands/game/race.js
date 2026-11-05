@@ -1,6 +1,11 @@
 const { SlashCommandBuilder } = require("discord.js");
 const crypto = require("node:crypto");
-const { MIN_BET, TOTAL, pickWeighted, play } = require("../../managers/instantGame");
+const {
+  MIN_BET,
+  TOTAL,
+  pickWeighted,
+  play,
+} = require("../../managers/instantGame");
 
 // 우승 확률 × 배당 ≈ 0.94 → 환수율 94%
 const ANIMALS = [
@@ -19,9 +24,20 @@ module.exports = {
         .setName("동물")
         .setDescription("누가 우승할까요?")
         .setRequired(true)
-        .addChoices(...ANIMALS.map((a) => ({ name: `${a.name} (우승 ${Math.round((a.weight / TOTAL) * 100)}% · ${a.mult}배)`, value: a.key }))),
+        .addChoices(
+          ...ANIMALS.map((a) => ({
+            name: `${a.name} (우승 ${Math.round((a.weight / TOTAL) * 100)}% · ${a.mult}배)`,
+            value: a.key,
+          })),
+        ),
     )
-    .addIntegerOption((o) => o.setName("금액").setDescription("베팅할 금액").setRequired(true).setMinValue(MIN_BET)),
+    .addIntegerOption((o) =>
+      o
+        .setName("금액")
+        .setDescription("베팅할 금액")
+        .setRequired(true)
+        .setMinValue(MIN_BET),
+    ),
 
   async execute(interaction) {
     const pick = interaction.options.getString("동물");
@@ -36,7 +52,11 @@ module.exports = {
           const j = crypto.randomInt(i + 1);
           [rest[i], rest[j]] = [rest[j], rest[i]];
         }
-        return { winner, order: [winner, ...rest], mult: winner.key === pick ? winner.mult : 0 };
+        return {
+          winner,
+          order: [winner, ...rest],
+          mult: winner.key === pick ? winner.mult : 0,
+        };
       },
       (o) => ({
         title: o.mult ? "🏆 내 동물이 우승!" : "😢 아쉽게 졌어요...",

@@ -11,7 +11,13 @@ let updating = null; // 진행 중인 업데이트 Promise (동시에 여러 요
 let lastUpdateAt = 0;
 
 // 허용 링크 (이 외의 주소는 Lavalink에 넘기지 않음: 내부망 접근 등 SSRF 방지)
-const YOUTUBE_HOSTS = ["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be"];
+const YOUTUBE_HOSTS = [
+  "youtube.com",
+  "www.youtube.com",
+  "m.youtube.com",
+  "music.youtube.com",
+  "youtu.be",
+];
 const DIRECT_HOSTS = [
   "soundcloud.com",
   "www.soundcloud.com",
@@ -22,7 +28,8 @@ const DIRECT_HOSTS = [
   "vimeo.com",
   "www.vimeo.com",
 ];
-const isBandcamp = (host) => host === "bandcamp.com" || host.endsWith(".bandcamp.com");
+const isBandcamp = (host) =>
+  host === "bandcamp.com" || host.endsWith(".bandcamp.com");
 
 class ResolveError extends Error {
   constructor(userMessage) {
@@ -44,7 +51,8 @@ function parseUrl(text) {
 function updateYtdlp() {
   if (process.env.YTDLP_AUTO_UPDATE === "0") return Promise.resolve(false); // 자동 업데이트 끔(수동 업데이트)
   if (updating) return updating;
-  if (Date.now() - lastUpdateAt < UPDATE_COOLDOWN_MS) return Promise.resolve(false);
+  if (Date.now() - lastUpdateAt < UPDATE_COOLDOWN_MS)
+    return Promise.resolve(false);
   lastUpdateAt = Date.now();
   console.log("🎵 yt-dlp 추출 실패 → 업데이트를 시도합니다");
   updating = ytdlp.update().finally(() => {
@@ -61,17 +69,26 @@ async function extract(target, prefetch = false) {
     const detail = String(e.message || e);
     console.error("🎵 yt-dlp 실패:", detail.trim().slice(-300));
     if (VIDEO_PROBLEM.test(detail)) {
-      throw new ResolveError("이 영상은 재생할 수 없어요. (비공개·삭제·연령/지역 제한 등)");
+      throw new ResolveError(
+        "이 영상은 재생할 수 없어요. (비공개·삭제·연령/지역 제한 등)",
+      );
     }
     // 미리 준비(자동완성) 단계의 실패는 업데이트를 소모하지 않고, 실제 명령 때 다시 판단한다
     if (prefetch || !(await updateYtdlp())) {
-      throw new ResolveError("유튜브에서 곡 정보를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.");
+      throw new ResolveError(
+        "유튜브에서 곡 정보를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.",
+      );
     }
     try {
       return await ytdlp.extract(target);
     } catch (e2) {
-      console.error("🎵 yt-dlp 재시도 실패:", String(e2.message || e2).slice(0, 200));
-      throw new ResolveError("유튜브에서 곡 정보를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.");
+      console.error(
+        "🎵 yt-dlp 재시도 실패:",
+        String(e2.message || e2).slice(0, 200),
+      );
+      throw new ResolveError(
+        "유튜브에서 곡 정보를 가져오지 못했어요. 잠시 후 다시 시도해 주세요.",
+      );
     }
   }
 }
@@ -101,7 +118,9 @@ async function resolveInput(input, source = "soundcloud", opts = {}) {
   if (!url) {
     // http(s)가 아닌 주소(file:// 등)는 검색어로도 넘기지 않음
     if (/^[a-z][a-z0-9+.-]*:\/\//i.test(text)) {
-      throw new ResolveError("지원하지 않는 링크예요. (유튜브, 사운드클라우드, 밴드캠프, 트위치, 비메오)");
+      throw new ResolveError(
+        "지원하지 않는 링크예요. (유튜브, 사운드클라우드, 밴드캠프, 트위치, 비메오)",
+      );
     }
     if (source === "youtube") {
       const cachedId = cache.lookupSearch(text);
@@ -118,7 +137,10 @@ async function resolveInput(input, source = "soundcloud", opts = {}) {
         cache.saveSearch(text, id);
         const found = cache.find(id);
         if (found) return fromCache(id, found);
-        return fromInfo(await extract("https://www.youtube.com/watch?v=" + id, opts.prefetch), opts.prefetch);
+        return fromInfo(
+          await extract("https://www.youtube.com/watch?v=" + id, opts.prefetch),
+          opts.prefetch,
+        );
       }
       const info = await extract("ytsearch1:" + text, opts.prefetch);
       cache.saveSearch(text, info.id);
@@ -130,7 +152,9 @@ async function resolveInput(input, source = "soundcloud", opts = {}) {
   const host = url.hostname.toLowerCase();
   if (YOUTUBE_HOSTS.includes(host)) {
     if (url.pathname.startsWith("/playlist")) {
-      throw new ResolveError("유튜브 재생목록 링크는 아직 지원하지 않아요. 곡 링크를 넣어 주세요.");
+      throw new ResolveError(
+        "유튜브 재생목록 링크는 아직 지원하지 않아요. 곡 링크를 넣어 주세요.",
+      );
     }
     const id = cache.extractVideoId(url);
     const hit = id && cache.find(id);
@@ -140,7 +164,9 @@ async function resolveInput(input, source = "soundcloud", opts = {}) {
   if (DIRECT_HOSTS.includes(host) || isBandcamp(host)) {
     return { identifier: text };
   }
-  throw new ResolveError("지원하지 않는 링크예요. (유튜브, 사운드클라우드, 밴드캠프, 트위치, 비메오)");
+  throw new ResolveError(
+    "지원하지 않는 링크예요. (유튜브, 사운드클라우드, 밴드캠프, 트위치, 비메오)",
+  );
 }
 
 /** yt-dlp 메타데이터를 Lavalink 트랙 정보에 덮어쓴다 (http 소스는 제목이 비어 있음) */

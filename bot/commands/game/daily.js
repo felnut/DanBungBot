@@ -17,7 +17,6 @@ module.exports = {
     .setDescription("출석하고 돈 받자! 매일 밤 12시 갱신 💰"),
 
   async execute(interaction) {
-
     const userId = interaction.user.id;
 
     // 오늘 날짜 (KST 기준) 계산
@@ -29,7 +28,7 @@ module.exports = {
 
     let user;
     try {
-      user = getUserOrFail(interaction, 0);   // 가입 여부만 체크
+      user = getUserOrFail(interaction, 0); // 가입 여부만 체크
     } catch (err) {
       if (err.message === "NOT_REGISTERED") {
         return interaction.reply({
@@ -87,7 +86,9 @@ module.exports = {
         `**${kstNow.toLocaleDateString("ko-KR")}** 출석 인정!\n\n` +
           `기본 보상: **${baseReward.toLocaleString()} 원**\n` +
           `연속 보너스: **${streakBonus.toLocaleString()} 원**\n` +
-          (rescue > 0 ? `🆘 파산 방지 지원금: **${rescue.toLocaleString()} 원**\n` : "") +
+          (rescue > 0
+            ? `🆘 파산 방지 지원금: **${rescue.toLocaleString()} 원**\n`
+            : "") +
           "\n" +
           `🎉 총 **${totalReward.toLocaleString()} 원** 받았어요!`,
       )

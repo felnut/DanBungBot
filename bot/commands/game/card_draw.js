@@ -12,7 +12,21 @@ const cache = require("../utils/cache");
 // 이익(>1배) 약 32%, 본전(1배) 7.5%, 전액 손실 약 60%
 const BET_AMOUNT = 50000; // 고정 베팅 금액
 const SUITS = ["♥", "♦", "♣", "♠"];
-const RANKS = ["A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"];
+const RANKS = [
+  "A",
+  "2",
+  "3",
+  "4",
+  "5",
+  "6",
+  "7",
+  "8",
+  "9",
+  "10",
+  "J",
+  "Q",
+  "K",
+];
 const PAYOUT_BY_RANK = {
   A: 3,
   K: 2,
@@ -23,7 +37,9 @@ const PAYOUT_BY_RANK = {
 const JOKER_PAYOUT = 10;
 
 const DECK = [
-  ...SUITS.flatMap((suit) => RANKS.map((rank) => ({ label: `${rank}${suit}`, rank }))),
+  ...SUITS.flatMap((suit) =>
+    RANKS.map((rank) => ({ label: `${rank}${suit}`, rank })),
+  ),
   { label: "Joker", rank: "Joker" },
 ];
 
@@ -39,12 +55,9 @@ const stmtUpdateUserMoneyDelta = db.prepare(
 module.exports = {
   data: new SlashCommandBuilder()
     .setName("카드뽑기")
-    .setDescription(
-      "카드뽑기! 베팅 5만원, 카드 한 장으로 최대 10배!",
-    ),
+    .setDescription("카드뽑기! 베팅 5만원, 카드 한 장으로 최대 10배!"),
 
   async execute(interaction) {
-
     let user;
     try {
       user = getUserOrFail(interaction, BET_AMOUNT); // 가입 + 잔액 체크
@@ -91,7 +104,11 @@ module.exports = {
       .setDescription(`뽑은 카드: **${card.label}**`)
       .setColor(color)
       .addFields(
-        { name: title, value: `배당 **${multiplier}배** → ${prize.toLocaleString()}원 지급`, inline: false },
+        {
+          name: title,
+          value: `배당 **${multiplier}배** → ${prize.toLocaleString()}원 지급`,
+          inline: false,
+        },
         {
           name: "손익",
           value: `${net >= 0 ? "+" : ""}${net.toLocaleString()}원`,

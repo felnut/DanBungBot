@@ -44,7 +44,6 @@ module.exports = {
     .setDescription("500원으로 복권을 구매합니다. (200~50,000원 당첨)"),
 
   async execute(interaction) {
-
     const useFee = 500; // 복권 가격
 
     let user;
@@ -62,14 +61,20 @@ module.exports = {
     const buyEmbed = new EmbedBuilder()
       .setTitle("🎫 복권 준비 완료!")
       .setColor("#FFD700")
-      .setDescription("버튼 눌러서 복권 긁어보세요!\n낮은 금액이 더 잘 나와요~ (200 ~ 50,000원)")
+      .setDescription(
+        "버튼 눌러서 복권 긁어보세요!\n낮은 금액이 더 잘 나와요~ (200 ~ 50,000원)",
+      )
       .addFields(
         {
           name: "🧾 결제",
           value: `긁을 때 500원이 차감돼요\n잔액: **${user.money.toLocaleString()}원**`,
           inline: true,
         },
-        { name: "⏰ 제한시간", value: "60초 안에 클릭! (안 누르면 요금 없음)", inline: true },
+        {
+          name: "⏰ 제한시간",
+          value: "60초 안에 클릭! (안 누르면 요금 없음)",
+          inline: true,
+        },
       );
 
     const row = new ActionRowBuilder().addComponents(
@@ -100,20 +105,30 @@ module.exports = {
       // 긁는 순간 요금 차감 + 당첨금 지급을 한 번에 처리 (잔액이 부족하면 취소)
       const prize = drawPrize();
       const paid = db
-        .prepare("UPDATE user SET money = money - ? + ? WHERE user_id = ? AND money >= ?")
+        .prepare(
+          "UPDATE user SET money = money - ? + ? WHERE user_id = ? AND money >= ?",
+        )
         .run(useFee, prize, user.user_id, useFee).changes;
       if (!paid) {
-        await message.edit({ content: "💸 잔액이 부족해서 복권을 긁을 수 없어요.", embeds: [], components: [] });
+        await message.edit({
+          content: "💸 잔액이 부족해서 복권을 긁을 수 없어요.",
+          embeds: [],
+          components: [],
+        });
         collector.stop();
         return;
       }
-      const newMoney = db.prepare("SELECT money FROM user WHERE user_id = ?").get(user.user_id).money;
+      const newMoney = db
+        .prepare("SELECT money FROM user WHERE user_id = ?")
+        .get(user.user_id).money;
       cache.invalidateMoney(user.user_id);
       require("../../managers/progress").record(user.user_id, "lotto");
 
       const resultEmbed = new EmbedBuilder()
         .setTitle("💰 당첨 결과!")
-        .setColor(prize >= 10000 ? "#00FF88" : prize >= 500 ? "#88DDFF" : "#AAAAAA")
+        .setColor(
+          prize >= 10000 ? "#00FF88" : prize >= 500 ? "#88DDFF" : "#AAAAAA",
+        )
         .setDescription(`🎉 **${prize.toLocaleString()}원** 당첨!! 축하해요!`)
         .addFields({
           name: "현재 잔액",
@@ -130,7 +145,11 @@ module.exports = {
     collector.on("end", async () => {
       if (!claimed) {
         await interaction
-          .editReply({ content: "시간이 지나서 취소됐어요~ 요금은 받지 않았어요!", embeds: [], components: [] })
+          .editReply({
+            content: "시간이 지나서 취소됐어요~ 요금은 받지 않았어요!",
+            embeds: [],
+            components: [],
+          })
           .catch(() => {});
       }
     });

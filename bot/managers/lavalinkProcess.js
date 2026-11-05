@@ -20,7 +20,8 @@ let stopping = false;
 let failures = 0;
 let hooksInstalled = false;
 
-const isLocalHost = (h) => ["127.0.0.1", "localhost", "::1"].includes(String(h).toLowerCase());
+const isLocalHost = (h) =>
+  ["127.0.0.1", "localhost", "::1"].includes(String(h).toLowerCase());
 
 /** 포트가 열려 있는지 (1초 안에 연결되면 열려 있음) */
 function isPortOpen(port, host) {
@@ -51,24 +52,37 @@ function launch() {
   const err = openLog(ERR_LOG);
   const startedAt = Date.now();
   try {
-    child = spawn("java", ["-Xmx512m", "-jar", "Lavalink.jar"], { cwd: DIR, stdio: ["ignore", out, err], windowsHide: true });
+    child = spawn("java", ["-Xmx512m", "-jar", "Lavalink.jar"], {
+      cwd: DIR,
+      stdio: ["ignore", out, err],
+      windowsHide: true,
+    });
   } finally {
     fs.closeSync(out);
     fs.closeSync(err);
   }
-  console.log(`🎵 Lavalink를 실행했어요 (PID ${child.pid}). 준비되는 데 10~30초 걸려요.`);
+  console.log(
+    `🎵 Lavalink를 실행했어요 (PID ${child.pid}). 준비되는 데 10~30초 걸려요.`,
+  );
 
   child.on("error", (e) => {
     child = null;
     stopping = true; // 실행 파일 자체가 없으면 다시 시도해도 소용없다
-    console.error("🎵 Lavalink 실행 실패:", e.code === "ENOENT" ? "java를 찾을 수 없어요. Java 17 이상을 설치해 주세요." : e.message);
+    console.error(
+      "🎵 Lavalink 실행 실패:",
+      e.code === "ENOENT"
+        ? "java를 찾을 수 없어요. Java 17 이상을 설치해 주세요."
+        : e.message,
+    );
   });
   child.on("exit", (code, signal) => {
     child = null;
     if (stopping) return;
     failures = Date.now() - startedAt > STABLE_MS ? 1 : failures + 1;
     const delay = Math.min(5000 * 2 ** Math.min(failures - 1, 4), 60_000); // 5초 → 10초 → … 최대 60초
-    console.warn(`🎵 Lavalink가 종료됐어요 (${signal ?? `코드 ${code}`}). ${delay / 1000}초 뒤 다시 실행합니다.`);
+    console.warn(
+      `🎵 Lavalink가 종료됐어요 (${signal ?? `코드 ${code}`}). ${delay / 1000}초 뒤 다시 실행합니다.`,
+    );
     setTimeout(() => {
       if (!stopping && !child) launch();
     }, delay);
@@ -90,7 +104,9 @@ function stopLavalink() {
 /** Lavalink를 실행한다 (이미 실행 중이거나 자동 실행을 끈 경우에는 아무것도 하지 않는다) */
 async function startLavalink() {
   if (process.env.LAVALINK_AUTOSTART === "0") {
-    console.log("🎵 LAVALINK_AUTOSTART=0 이라 Lavalink를 자동으로 실행하지 않아요.");
+    console.log(
+      "🎵 LAVALINK_AUTOSTART=0 이라 Lavalink를 자동으로 실행하지 않아요.",
+    );
     return;
   }
   const host = process.env.LAVALINK_HOST || "127.0.0.1";
@@ -99,11 +115,15 @@ async function startLavalink() {
   const pw = process.env.LAVALINK_PASSWORD;
   if (!pw || pw === "CHANGE_ME") return; // 음악 기능이 꺼져 있다 (createMusicManager가 안내)
   if (!fs.existsSync(JAR) || !fs.existsSync(CONFIG)) {
-    console.warn("🎵 music/Lavalink.jar 또는 music/application.yml이 없어 Lavalink를 실행하지 못해요. README의 '음악 재생' 설정을 확인해 주세요.");
+    console.warn(
+      "🎵 music/Lavalink.jar 또는 music/application.yml이 없어 Lavalink를 실행하지 못해요. README의 '음악 재생' 설정을 확인해 주세요.",
+    );
     return;
   }
   if (await isPortOpen(port, host)) {
-    console.log(`🎵 Lavalink가 이미 실행 중이에요 (${host}:${port}). 그대로 이어서 사용합니다.`);
+    console.log(
+      `🎵 Lavalink가 이미 실행 중이에요 (${host}:${port}). 그대로 이어서 사용합니다.`,
+    );
     return;
   }
   if (!hooksInstalled) {

@@ -7,8 +7,12 @@ const SEND_FROM_MIN = 7 * 60 + 30; // 07:30
 const SEND_UNTIL_MIN = 10 * 60; // 10:00 이후에 켜졌다면 그날은 건너뜀
 const CHECK_MS = 30 * 1000;
 
-const stmtAll = db.prepare("SELECT guild_id, channel_id, last_sent FROM lunch_notice");
-const stmtSent = db.prepare("UPDATE lunch_notice SET last_sent = ? WHERE guild_id = ?");
+const stmtAll = db.prepare(
+  "SELECT guild_id, channel_id, last_sent FROM lunch_notice",
+);
+const stmtSent = db.prepare(
+  "UPDATE lunch_notice SET last_sent = ? WHERE guild_id = ?",
+);
 const stmtRemove = db.prepare("DELETE FROM lunch_notice WHERE guild_id = ?");
 
 function normalizeMenu(raw) {
@@ -31,14 +35,25 @@ async function buildLunchEmbed(school, ymd = kstDate(0).ymd) {
     .setTitle(`🍴 오늘의 ${meal.MMEAL_SC_NM ?? "급식"}`)
     .setAuthor({ name: school.name })
     .setDescription(`**${ymd.replace(/(\d{4})(\d{2})(\d{2})/, "$1-$2-$3")}**`)
-    .addFields({ name: "메뉴", value: `\`\`\`text\n${normalizeMenu(meal.DDISH_NM)}\n\`\`\`` })
+    .addFields({
+      name: "메뉴",
+      value: `\`\`\`text\n${normalizeMenu(meal.DDISH_NM)}\n\`\`\``,
+    })
     .setTimestamp();
 }
 
 async function tick(client) {
   const now = kstDate(0);
-  const minutes = new Date(Date.now() + 9 * 3600e3).getUTCHours() * 60 + new Date(Date.now() + 9 * 3600e3).getUTCMinutes();
-  if (now.dow < 1 || now.dow > 5 || minutes < SEND_FROM_MIN || minutes >= SEND_UNTIL_MIN) return;
+  const minutes =
+    new Date(Date.now() + 9 * 3600e3).getUTCHours() * 60 +
+    new Date(Date.now() + 9 * 3600e3).getUTCMinutes();
+  if (
+    now.dow < 1 ||
+    now.dow > 5 ||
+    minutes < SEND_FROM_MIN ||
+    minutes >= SEND_UNTIL_MIN
+  )
+    return;
 
   const pending = stmtAll.all().filter((r) => r.last_sent !== now.iso);
   if (!pending.length) return;
@@ -72,7 +87,11 @@ async function tick(client) {
 }
 
 function startLunchNotice(client) {
-  setInterval(() => tick(client).catch((e) => console.error("급식 알림 오류:", e.message)), CHECK_MS).unref();
+  setInterval(
+    () =>
+      tick(client).catch((e) => console.error("급식 알림 오류:", e.message)),
+    CHECK_MS,
+  ).unref();
 }
 
 module.exports = { startLunchNotice, buildLunchEmbed };

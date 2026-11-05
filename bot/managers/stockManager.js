@@ -38,7 +38,9 @@ const stmtUpdateHoldingSharesDelta = db.prepare(
 const stmtAddRealized = db.prepare(
   "INSERT INTO stock_realized (user_id, profit) VALUES (?, ?) ON CONFLICT(user_id) DO UPDATE SET profit = profit + excluded.profit",
 );
-const stmtSelectRealized = db.prepare("SELECT profit FROM stock_realized WHERE user_id = ?");
+const stmtSelectRealized = db.prepare(
+  "SELECT profit FROM stock_realized WHERE user_id = ?",
+);
 const stmtDeleteHolding = db.prepare(
   "DELETE FROM user_stocks WHERE user_id = ? AND symbol = ?",
 );
@@ -202,7 +204,8 @@ const NEWS_POOL = {
       impactMax: -0.13,
     },
     {
-      title: "해외 수출용 제품 일부에서 성분 표시 미비로 인한 자발적 리콜 실시.",
+      title:
+        "해외 수출용 제품 일부에서 성분 표시 미비로 인한 자발적 리콜 실시.",
       impactMin: -0.05,
       impactMax: -0.11,
     },
@@ -253,20 +256,17 @@ const NEWS_POOL = {
   ],
   msd: [
     {
-      title:
-        '"학습지 대신 AI 구독" 스마트올 500만 돌파… 구독 매출 3배 폭증',
+      title: '"학습지 대신 AI 구독" 스마트올 500만 돌파… 구독 매출 3배 폭증',
       impactMin: 0.18,
       impactMax: 0.33,
     },
     {
-      title:
-        "디지털 교과서 전국 도입 확대… 온라인 교육 콘텐츠 공급 계약 체결",
+      title: "디지털 교과서 전국 도입 확대… 온라인 교육 콘텐츠 공급 계약 체결",
       impactMin: 0.09,
       impactMax: 0.2,
     },
     {
-      title:
-        "K-에듀 해외 습격… 코딩·로봇 교육 솔루션 북미·동남아 점유율 1위",
+      title: "K-에듀 해외 습격… 코딩·로봇 교육 솔루션 북미·동남아 점유율 1위",
       impactMin: 0.07,
       impactMax: 0.16,
     },
@@ -277,8 +277,7 @@ const NEWS_POOL = {
       impactMax: -0.14,
     },
     {
-      title:
-        "문제 유출 의심으로 저작권 침해 소송 및 일부 서비스 중단 리스크",
+      title: "문제 유출 의심으로 저작권 침해 소송 및 일부 서비스 중단 리스크",
       impactMin: -0.05,
       impactMax: -0.12,
     },
@@ -291,8 +290,7 @@ const NEWS_POOL = {
   ],
   sgmn: [
     {
-      title:
-        "'SeoGemini 4.0' 대규모 업데이트 적중… 기업용 B2B 계약 10배 폭증",
+      title: "'SeoGemini 4.0' 대규모 업데이트 적중… 기업용 B2B 계약 10배 폭증",
       impactMin: 0.2,
       impactMax: 0.35,
     },
@@ -333,13 +331,62 @@ const NEWS_POOL = {
 // 종목 시작
 const STOCKS = {
   // vol: 종목 고유 변동성, beta: 시장 전체 움직임에 대한 민감도, base: 지수 기준가
-  hys: { name: "한양반도체", base_t: 0.0012, news: 1.4, vol: 1.0, beta: 1.3, base: 145000 },
-  ftc: { name: "퓨처캐피탈", base_t: 0.0008, news: 1.2, vol: 0.8, beta: 1.1, base: 82000 },
-  djc: { name: "대진건설", base_t: 0.0006, news: 1.1, vol: 0.6, beta: 0.9, base: 39500 },
-  hgf: { name: "한그린푸드", base_t: 0.0009, news: 1.3, vol: 0.7, beta: 0.5, base: 24800 },
-  bhx: { name: "바이오헬릭스", base_t: 0.0018, news: 1.6, vol: 1.6, beta: 1.0, base: 168000 },
-  msd: { name: "마이크로스터디", base_t: 0.001, news: 1.25, vol: 1.1, beta: 0.8, base: 91000 },
-  sgmn: { name: "서재미나이", base_t: 0.0015, news: 1.45, vol: 1.4, beta: 1.4, base: 132000 },
+  hys: {
+    name: "한양반도체",
+    base_t: 0.0012,
+    news: 1.4,
+    vol: 1.0,
+    beta: 1.3,
+    base: 145000,
+  },
+  ftc: {
+    name: "퓨처캐피탈",
+    base_t: 0.0008,
+    news: 1.2,
+    vol: 0.8,
+    beta: 1.1,
+    base: 82000,
+  },
+  djc: {
+    name: "대진건설",
+    base_t: 0.0006,
+    news: 1.1,
+    vol: 0.6,
+    beta: 0.9,
+    base: 39500,
+  },
+  hgf: {
+    name: "한그린푸드",
+    base_t: 0.0009,
+    news: 1.3,
+    vol: 0.7,
+    beta: 0.5,
+    base: 24800,
+  },
+  bhx: {
+    name: "바이오헬릭스",
+    base_t: 0.0018,
+    news: 1.6,
+    vol: 1.6,
+    beta: 1.0,
+    base: 168000,
+  },
+  msd: {
+    name: "마이크로스터디",
+    base_t: 0.001,
+    news: 1.25,
+    vol: 1.1,
+    beta: 0.8,
+    base: 91000,
+  },
+  sgmn: {
+    name: "서재미나이",
+    base_t: 0.0015,
+    news: 1.45,
+    vol: 1.4,
+    beta: 1.4,
+    base: 132000,
+  },
 };
 //종목 끝
 
@@ -373,9 +420,15 @@ const REGIMES = [
 const REGIME_SWITCH_PROB = 0.033; // 틱당 국면 전환 확률 (하루 남짓 지속)
 
 // market_state 테이블과 stocks.day_open/day_high/day_low 컬럼은 Database.js 마이그레이션에서 생성된다.
-const stmtMarketState = db.prepare("SELECT vol_mult, last_day FROM market_state WHERE id = 1");
-const stmtSetVol = db.prepare("UPDATE market_state SET vol_mult = ? WHERE id = 1");
-const stmtSetDay = db.prepare("UPDATE market_state SET last_day = ? WHERE id = 1");
+const stmtMarketState = db.prepare(
+  "SELECT vol_mult, last_day FROM market_state WHERE id = 1",
+);
+const stmtSetVol = db.prepare(
+  "UPDATE market_state SET vol_mult = ? WHERE id = 1",
+);
+const stmtSetDay = db.prepare(
+  "UPDATE market_state SET last_day = ? WHERE id = 1",
+);
 const stmtAllForTick = db.prepare(
   "SELECT symbol, price, latent_price, last_price, day_open, day_high, day_low, history FROM stocks",
 );
@@ -397,7 +450,9 @@ const stmtOpenWithNews = db.prepare(
   "UPDATE stocks SET price = ?, latent_price = ?, last_change = ?, day_open = ?, day_high = ?, day_low = ?, last_news_title = ?, last_news_time = ? WHERE symbol = ?",
 );
 // 장 마감 중 틱: 숨은 주가만 갱신 (화면의 가격은 그대로)
-const stmtLatentNoNews = db.prepare("UPDATE stocks SET latent_price = ? WHERE symbol = ?");
+const stmtLatentNoNews = db.prepare(
+  "UPDATE stocks SET latent_price = ? WHERE symbol = ?",
+);
 const stmtLatentWithNews = db.prepare(
   "UPDATE stocks SET latent_price = ?, last_news_title = ?, last_news_time = ? WHERE symbol = ?",
 );
@@ -459,7 +514,9 @@ function getMarketStatus() {
 function rolloverDay(dayStr) {
   const rows = stmtAllForTick.all();
   for (const r of rows) {
-    const hist = (r.history ? r.history.split(",").filter(Boolean) : []).concat(String(r.price));
+    const hist = (r.history ? r.history.split(",").filter(Boolean) : []).concat(
+      String(r.price),
+    );
     stmtRollover.run(hist.slice(-20).join(","), r.symbol);
   }
   stmtSetDay.run(dayStr);
@@ -524,30 +581,72 @@ async function updateStockPrices({ force = false } = {}) {
       const prevClose = open ? stock.last_price || stock.price : stock.price;
       const lower = Math.max(Math.round(prevClose * (1 - DAILY_LIMIT)), 1);
       const upper = Math.round(prevClose * (1 + DAILY_LIMIT));
-      const newPrice = Math.min(Math.max(Math.round(base * (1 + change)), lower), upper);
+      const newPrice = Math.min(
+        Math.max(Math.round(base * (1 + change)), lower),
+        upper,
+      );
 
       if (!open) {
         // 장 마감 중: 화면의 가격은 그대로, 숨은 주가와 뉴스만 갱신
-        if (news) stmtLatentWithNews.run(newPrice, news.title, nowSec, stock.symbol);
+        if (news)
+          stmtLatentWithNews.run(newPrice, news.title, nowSec, stock.symbol);
         else stmtLatentNoNews.run(newPrice, stock.symbol);
         continue;
       }
 
       // 장중: 보이는 가격 = 숨은 주가. 첫 틱이면 마감 동안의 변동이 갭으로 한 번에 반영된다
-      const high = newDay ? newPrice : Math.max(stock.day_high || stock.price, newPrice);
-      const low = newDay ? newPrice : Math.min(stock.day_low || stock.price, newPrice);
+      const high = newDay
+        ? newPrice
+        : Math.max(stock.day_high || stock.price, newPrice);
+      const low = newDay
+        ? newPrice
+        : Math.min(stock.day_low || stock.price, newPrice);
       const realized = stock.price > 0 ? newPrice / stock.price - 1 : 0;
 
       if (newDay) {
         if (news) {
-          stmtOpenWithNews.run(newPrice, newPrice, realized, newPrice, high, low, news.title, nowSec, stock.symbol);
+          stmtOpenWithNews.run(
+            newPrice,
+            newPrice,
+            realized,
+            newPrice,
+            high,
+            low,
+            news.title,
+            nowSec,
+            stock.symbol,
+          );
         } else {
-          stmtOpenNoNews.run(newPrice, newPrice, realized, newPrice, high, low, stock.symbol);
+          stmtOpenNoNews.run(
+            newPrice,
+            newPrice,
+            realized,
+            newPrice,
+            high,
+            low,
+            stock.symbol,
+          );
         }
       } else if (news) {
-        stmtTickWithNews.run(newPrice, newPrice, realized, high, low, news.title, nowSec, stock.symbol);
+        stmtTickWithNews.run(
+          newPrice,
+          newPrice,
+          realized,
+          high,
+          low,
+          news.title,
+          nowSec,
+          stock.symbol,
+        );
       } else {
-        stmtTickNoNews.run(newPrice, newPrice, realized, high, low, stock.symbol);
+        stmtTickNoNews.run(
+          newPrice,
+          newPrice,
+          realized,
+          high,
+          low,
+          stock.symbol,
+        );
       }
     }
   });
@@ -570,7 +669,9 @@ const RESET_COMPENSATION_RATE = 0.5; // 기존 보유 주식 평가액(수량 ×
  * @returns {null | {users:number, totalPaid:number, totalValue:number, backupPath:string}} 이미 실행했다면 null
  */
 function resetStocksOnce() {
-  const state = db.prepare("SELECT stock_reset_done FROM market_state WHERE id = 1").get();
+  const state = db
+    .prepare("SELECT stock_reset_done FROM market_state WHERE id = 1")
+    .get();
   if (state.stock_reset_done) return null;
 
   // 1) 백업 (트랜잭션 밖에서 실행해야 함)
@@ -589,7 +690,10 @@ function resetStocksOnce() {
       .all();
     const valueByUser = new Map();
     for (const r of rows) {
-      valueByUser.set(r.user_id, (valueByUser.get(r.user_id) || 0) + r.shares * r.price);
+      valueByUser.set(
+        r.user_id,
+        (valueByUser.get(r.user_id) || 0) + r.shares * r.price,
+      );
     }
 
     // 3) 평가액의 50%를 현금으로 지급
@@ -608,14 +712,24 @@ function resetStocksOnce() {
       db.prepare(
         `UPDATE stocks SET price = ?, latent_price = ?, last_price = ?, day_open = ?, day_high = ?, day_low = ?,
            history = '', last_change = 0, last_news_title = NULL, last_news_time = 0 WHERE symbol = ?`,
-      ).run(info.base, info.base, info.base, info.base, info.base, info.base, symbol);
+      ).run(
+        info.base,
+        info.base,
+        info.base,
+        info.base,
+        info.base,
+        info.base,
+        symbol,
+      );
     }
     stmtSetVol.run(1);
     stmtSetDay.run(null);
     rolloverDay(getKST().dayStr);
 
     report = { users: valueByUser.size, totalPaid, totalValue, backupPath };
-    db.prepare("UPDATE market_state SET stock_reset_done = 1 WHERE id = 1").run();
+    db.prepare(
+      "UPDATE market_state SET stock_reset_done = 1 WHERE id = 1",
+    ).run();
   })();
 
   cache.del("stocks:snapshotRows");
@@ -668,9 +782,11 @@ function getRandomNews(symbol, up) {
 // 매수 / 매도 함수들 (buyStock, sellStock)
 // ────────────────────────────────────────────────
 
-const MARKET_CLOSED_MSG = "장 마감 중에는 거래 불가 (거래 가능: 평일 06:00~23:00, 국경일 제외)";
+const MARKET_CLOSED_MSG =
+  "장 마감 중에는 거래 불가 (거래 가능: 평일 06:00~23:00, 국경일 제외)";
 
-const OPEN_PENDING_MSG = "개장 시세를 반영하는 중이에요. 잠시 후 다시 시도해 주세요.";
+const OPEN_PENDING_MSG =
+  "개장 시세를 반영하는 중이에요. 잠시 후 다시 시도해 주세요.";
 
 /** 오늘 개장 틱(마감 중 변동의 갭 반영)이 실행되었는가 */
 function isOpenTickDone() {
@@ -740,7 +856,10 @@ function sellStock(userId, symbol, quantity) {
     stmtUpdateUserMoneyDelta.run(totalGain, userId);
     stmtUpdateHoldingSharesDelta.run(quantity, userId, symbol);
     // 매도로 확정된 손익 누적 (/주식 수익)
-    stmtAddRealized.run(userId, totalGain - Math.round(holding.avg_buy_price * quantity));
+    stmtAddRealized.run(
+      userId,
+      totalGain - Math.round(holding.avg_buy_price * quantity),
+    );
 
     if (holding.shares - quantity <= 0) {
       stmtDeleteHolding.run(userId, symbol);
@@ -819,13 +938,24 @@ function createStockUpdateEmbed() {
     const prev = s.last_price || s.price;
     const rate = prev > 0 ? s.price / prev - 1 : 0;
     const icon = rate > 0 ? "🔺" : rate < 0 ? "🔻" : "▫️";
-    const limit = s.price >= Math.round(prev * (1 + DAILY_LIMIT)) ? " 🚫상한가" : s.price <= Math.max(Math.round(prev * (1 - DAILY_LIMIT)), 1) ? " 🚫하한가" : "";
-    const hist = (s.history ? s.history.split(",").filter(Boolean).map(Number) : []).slice(-9);
+    const limit =
+      s.price >= Math.round(prev * (1 + DAILY_LIMIT))
+        ? " 🚫상한가"
+        : s.price <= Math.max(Math.round(prev * (1 - DAILY_LIMIT)), 1)
+          ? " 🚫하한가"
+          : "";
+    const hist = (
+      s.history ? s.history.split(",").filter(Boolean).map(Number) : []
+    ).slice(-9);
     // 종가 기록이 충분히 쌓였을 때만 미니 차트를 보여 준다 (점이 2~3개면 오히려 헷갈림)
     const chart = hist.length >= 4 ? sparkline([...hist, s.price]) : "";
-    const lines = [`**${s.price.toLocaleString()}원**  ${fmtPct(rate)}${limit}`];
+    const lines = [
+      `**${s.price.toLocaleString()}원**  ${fmtPct(rate)}${limit}`,
+    ];
     if (s.day_high && s.day_low) {
-      lines.push(`오늘 최고 ${s.day_high.toLocaleString()}원 · 최저 ${s.day_low.toLocaleString()}원`);
+      lines.push(
+        `오늘 최고 ${s.day_high.toLocaleString()}원 · 최저 ${s.day_low.toLocaleString()}원`,
+      );
     }
     if (chart) lines.push(`최근 종가 흐름 \`${chart}\``);
 
@@ -959,8 +1089,12 @@ function createRealizedEmbed(userId, username) {
   return new EmbedBuilder()
     .setColor(realized >= 0 ? 0x57f287 : 0xed4245)
     .setTitle(`💵 ${username}님의 주식 실현 수익`)
-    .setDescription(`매도로 확정한 누적 손익\n# ${realized > 0 ? "🔺" : realized < 0 ? "🔻" : "▬"} ${sign}${realized.toLocaleString()}원`)
-    .setFooter({ text: "보유 중인 주식의 평가손익은 /주식 내주식 에서 확인해요 · 이 기능 추가 전 거래는 포함되지 않아요" });
+    .setDescription(
+      `매도로 확정한 누적 손익\n# ${realized > 0 ? "🔺" : realized < 0 ? "🔻" : "▬"} ${sign}${realized.toLocaleString()}원`,
+    )
+    .setFooter({
+      text: "보유 중인 주식의 평가손익은 /주식 내주식 에서 확인해요 · 이 기능 추가 전 거래는 포함되지 않아요",
+    });
 }
 
 /** DB에 등록된 종목(이름·심볼) — 슬래시 자동완성용 */
@@ -977,11 +1111,17 @@ function createStockNewsEmbed(symbol) {
     .all()
     .filter((s) => (!symbol || s.symbol === symbol) && s.last_news_title)
     .sort((a, b) => b.last_news_time - a.last_news_time);
-  const embed = new EmbedBuilder().setColor(0x00aa99).setTitle("📰 주식 뉴스").setTimestamp();
+  const embed = new EmbedBuilder()
+    .setColor(0x00aa99)
+    .setTitle("📰 주식 뉴스")
+    .setTimestamp();
   embed.setDescription(
     rows.length
       ? rows
-          .map((s) => `**${s.name}** (${s.symbol.toUpperCase()}) · <t:${s.last_news_time}:R>\n${s.last_news_title}`)
+          .map(
+            (s) =>
+              `**${s.name}** (${s.symbol.toUpperCase()}) · <t:${s.last_news_time}:R>\n${s.last_news_title}`,
+          )
           .join("\n\n")
           .slice(0, 4000)
       : "최근 뉴스가 없어요.",
@@ -993,7 +1133,9 @@ function createStockNewsEmbed(symbol) {
 function createChartEmbed(symbol) {
   const s = stmtSelectStocksForEmbed.all().find((r) => r.symbol === symbol);
   if (!s) return null;
-  const hist = (s.history ? s.history.split(",").filter(Boolean).map(Number) : []).slice(-14);
+  const hist = (
+    s.history ? s.history.split(",").filter(Boolean).map(Number) : []
+  ).slice(-14);
   const series = [...hist, s.price];
   const prev = s.last_price || s.price;
   const rate = prev > 0 ? s.price / prev - 1 : 0;
@@ -1009,13 +1151,21 @@ function createChartEmbed(symbol) {
     .setDescription(`${head}**${s.price.toLocaleString()}원** ${fmtPct(rate)}`)
     .addFields(
       { name: "전일 종가", value: `${prev.toLocaleString()}원`, inline: true },
-      { name: "오늘 시가", value: `${(s.day_open || s.price).toLocaleString()}원`, inline: true },
+      {
+        name: "오늘 시가",
+        value: `${(s.day_open || s.price).toLocaleString()}원`,
+        inline: true,
+      },
       {
         name: "오늘 고가 / 저가",
         value: `${(s.day_high || s.price).toLocaleString()} / ${(s.day_low || s.price).toLocaleString()}원`,
         inline: true,
       },
-      { name: "기간 최고 / 최저", value: `${hi.toLocaleString()} / ${lo.toLocaleString()}원`, inline: true },
+      {
+        name: "기간 최고 / 최저",
+        value: `${hi.toLocaleString()} / ${lo.toLocaleString()}원`,
+        inline: true,
+      },
     )
     .setTimestamp();
 }
