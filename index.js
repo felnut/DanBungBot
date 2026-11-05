@@ -52,7 +52,7 @@ process.on("uncaughtException", (err) =>
 // 음악(Lavalink) 클라이언트 (Lavalink 서버가 꺼져 있어도 봇은 동작함)
 require("./bot/managers/musicManager").createMusicManager(client);
 require("./bot/managers/musicCache").startCacheServer(); // 곡 캐시 파일 서버 (Lavalink가 읽음)
-require("./bot/managers/siteApi").startSiteApi(); // 사이트 내 정보용 읽기 전용 API (SITE_API_TOKEN 설정 시)
+require("./bot/managers/siteApi").startSiteApi(client); // 사이트 내 정보용 읽기 전용 API (SITE_API_TOKEN 설정 시)
 require("./bot/managers/ytdlp").warmup(); // yt-dlp 워커를 미리 띄워 첫 요청 지연 제거
 
 // ================== 커맨드 핸들러 초기화 ==================

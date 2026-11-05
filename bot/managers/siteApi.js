@@ -13,18 +13,29 @@ const same = (a, b) => {
   return x.length === y.length && crypto.timingSafeEqual(x, y);
 };
 
-function startSiteApi() {
+function startSiteApi(client) {
   if (!TOKEN) return console.log("🌐 사이트 API 꺼짐 (SITE_API_TOKEN 없음)");
+  const registered = db.prepare("SELECT guild_id FROM admin_contact WHERE user_id = ? ORDER BY guild_id");
+  const { registeredGuilds } = require("./siteAdmin");
   const find = db.prepare("SELECT money, streak FROM user WHERE user_id = ?");
   http
-    .createServer((req, res) => {
+    .createServer(async (req, res) => {
       const json = (code, body) =>
         res
-          .writeHead(code, { "Content-Type": "application/json" })
+          .writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store" })
           .end(JSON.stringify(body));
       const auth = (req.headers.authorization || "").replace(/^Bearer /, "");
       if (req.method !== "GET" || !same(auth, TOKEN))
         return json(401, { error: "unauthorized" });
+      const admin = req.url.match(/^\/admin\/(\d{15,25})$/);
+      if (admin) {
+        try {
+          const rows = registered.all(admin[1]);
+          if (!rows.length) return json(403, { error: "forbidden" });
+          const guilds = await registeredGuilds(client, rows, admin[1]);
+          return guilds.length ? json(200, { guilds }) : json(403, { error: "forbidden" });
+        } catch { return json(503, { error: "unavailable" }); }
+      }
       const m = req.url.match(/^\/user\/(\d{15,25})$/);
       if (!m) return json(404, { error: "not_found" });
       const row = find.get(m[1]);
