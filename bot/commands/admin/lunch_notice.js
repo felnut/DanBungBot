@@ -8,12 +8,13 @@ const db = require("../../../Database");
 const { isServerManager } = require("../utils/perm");
 
 const EPHEMERAL = MessageFlags.Ephemeral;
+const { formatTime } = require("../../managers/lunchSchedule");
 
 const stmtSet = db.prepare(
   "INSERT INTO lunch_notice (guild_id, channel_id, last_sent) VALUES (?, ?, NULL) ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id",
 );
 const stmtGet = db.prepare(
-  "SELECT channel_id FROM lunch_notice WHERE guild_id = ?",
+  "SELECT channel_id, send_minutes FROM lunch_notice WHERE guild_id = ?",
 );
 const stmtDel = db.prepare("DELETE FROM lunch_notice WHERE guild_id = ?");
 
@@ -21,7 +22,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName("급식알림")
     .setDescription(
-      "평일 아침 7시 30분에 오늘 급식을 자동으로 올려요 (설정·해제는 서버 운영자 전용)",
+      "평일 설정한 시간(기본 07:30)에 오늘 급식을 자동으로 올려요 (설정·해제는 서버 운영자 전용)",
     )
     .setDMPermission(false)
     .addSubcommand((s) =>
@@ -71,7 +72,7 @@ module.exports = {
       }
       stmtSet.run(interaction.guildId, ch.id);
       return interaction.reply({
-        content: `✅ 평일 07:30에 <#${ch.id}>에 오늘 급식을 올릴게요. (급식이 없는 날은 올리지 않아요)`,
+        content: `✅ 평일 ${formatTime(stmtGet.get(interaction.guildId)?.send_minutes)}에 <#${ch.id}>에 오늘 급식을 올릴게요. (급식이 없는 날은 올리지 않아요)`,
         flags: EPHEMERAL,
       });
     }
@@ -85,7 +86,7 @@ module.exports = {
     const row = stmtGet.get(interaction.guildId);
     return interaction.reply({
       content: row
-        ? `🔔 급식 알림: <#${row.channel_id}> (평일 07:30)`
+        ? `🔔 급식 알림: <#${row.channel_id}> (평일 ${formatTime(row.send_minutes)})`
         : "설정된 급식 알림이 없어요.",
       flags: EPHEMERAL,
     });

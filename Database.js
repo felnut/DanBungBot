@@ -258,6 +258,8 @@ db.exec(`
   )
 `);
 
+ensureColumn("lunch_notice", "send_minutes INTEGER NOT NULL DEFAULT 450");
+
 // 서버별 등록 학교 (/학교등록) — 시간표·학사일정·급식 조회에 사용. 서버마다 여러 학교를 등록할 수 있다
 const tableExists = (name) =>
   Boolean(

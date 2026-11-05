@@ -3,12 +3,11 @@ const db = require("../../Database");
 const { kstDate, neisRows, getSchools } = require("../commands/utils/neis");
 
 // 평일 급식 알림: 관리자가 /학교 급식알림설정 설정으로 채널을 정하면 아침에 오늘 급식을 올린다 (이용자 정보 없음, 채널 ID만 저장)
-const SEND_FROM_MIN = 7 * 60 + 30; // 07:30
-const SEND_UNTIL_MIN = 10 * 60; // 10:00 이후에 켜졌다면 그날은 건너뜀
+const { isDue } = require("./lunchSchedule");
 const CHECK_MS = 30 * 1000;
 
 const stmtAll = db.prepare(
-  "SELECT guild_id, channel_id, last_sent FROM lunch_notice",
+  "SELECT guild_id, channel_id, last_sent, send_minutes FROM lunch_notice",
 );
 const stmtSent = db.prepare(
   "UPDATE lunch_notice SET last_sent = ? WHERE guild_id = ?",
@@ -47,15 +46,9 @@ async function tick(client) {
   const minutes =
     new Date(Date.now() + 9 * 3600e3).getUTCHours() * 60 +
     new Date(Date.now() + 9 * 3600e3).getUTCMinutes();
-  if (
-    now.dow < 1 ||
-    now.dow > 5 ||
-    minutes < SEND_FROM_MIN ||
-    minutes >= SEND_UNTIL_MIN
-  )
-    return;
+  if (now.dow < 1 || now.dow > 5) return;
 
-  const pending = stmtAll.all().filter((r) => r.last_sent !== now.iso);
+  const pending = stmtAll.all().filter((r) => isDue(r, now.dow, minutes, now.iso));
   if (!pending.length) return;
 
   for (const r of pending) {
@@ -74,6 +67,8 @@ async function tick(client) {
       }
     }
     if (failed === schools.length) continue; // 전부 실패했으면 다음 확인 때 다시 시도
+    const current = db.prepare("SELECT channel_id, send_minutes, last_sent FROM lunch_notice WHERE guild_id = ?").get(r.guild_id);
+    if (!current || current.channel_id !== r.channel_id || current.send_minutes !== r.send_minutes || !isDue(current, now.dow, minutes, now.iso)) continue;
     stmtSent.run(now.iso, r.guild_id); // 먼저 표시해 중복 전송 방지
     if (!embeds.length) continue; // 급식 없는 날(휴업일 등)
     try {

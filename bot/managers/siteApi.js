@@ -17,6 +17,9 @@ function startSiteApi(client) {
   if (!TOKEN) return console.log("🌐 사이트 API 꺼짐 (SITE_API_TOKEN 없음)");
   const registered = db.prepare("SELECT guild_id FROM admin_contact WHERE user_id = ? ORDER BY guild_id");
   const { registeredGuilds } = require("./siteAdmin");
+  const { createAdminSettings, SettingsError, readBody } = require("./siteAdminSettings");
+  const { neisRows, getSchools, MAX_SCHOOLS } = require("../commands/utils/neis");
+  const settings = createAdminSettings({ db, client, neisRows, getSchools, maxSchools: MAX_SCHOOLS });
   const find = db.prepare("SELECT money, streak FROM user WHERE user_id = ?");
   http
     .createServer(async (req, res) => {
@@ -25,8 +28,26 @@ function startSiteApi(client) {
           .writeHead(code, { "Content-Type": "application/json", "Cache-Control": "no-store" })
           .end(JSON.stringify(body));
       const auth = (req.headers.authorization || "").replace(/^Bearer /, "");
-      if (req.method !== "GET" || !same(auth, TOKEN))
+      if (!same(auth, TOKEN))
         return json(401, { error: "unauthorized" });
+      const url = new URL(req.url, "http://localhost");
+      const setting = /^\/admin\/(\d{15,25})\/guild\/(\d{15,25})(\/schools)?$/.exec(url.pathname);
+      if (setting) {
+        try {
+          if (!["GET", "PATCH"].includes(req.method) || (setting[3] && req.method !== "GET"))
+            return json(405, { error: "method_not_allowed" });
+          const result = await settings.run({
+            userId: setting[1], guildId: setting[2], method: req.method,
+            query: setting[3] ? url.searchParams.get("q") || "" : undefined,
+            body: req.method === "PATCH" ? await readBody(req) : undefined,
+          });
+          return json(200, result);
+        } catch (error) {
+          return json(error instanceof SettingsError ? error.status : 503,
+            { error: error instanceof SettingsError ? error.message : "service_unavailable" });
+        }
+      }
+      if (req.method !== "GET") return json(405, { error: "method_not_allowed" });
       const admin = req.url.match(/^\/admin\/(\d{15,25})$/);
       if (admin) {
         try {
